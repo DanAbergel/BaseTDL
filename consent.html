@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>Consent</title>
+
+    <script src="https://unpkg.com/jspsych"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-survey-html-form@1.0.3"></script>
+    <link href="https://unpkg.com/jspsych@7.3.4/css/jspsych.css" rel="stylesheet" type="text/css">
+    <script src="https://unpkg.com/@jspsych/plugin-browser-check@1.0.3"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-call-function@1.1.3"></script>
+    <script src="jatos.js"></script>
+    <script src="libs/jquery-3.5.1.min.js"></script>
+
+    <link rel="stylesheet" href="libs/pure-release-0.6.0/pure-min.css">
+    <link rel="stylesheet" href="css/instructions.css" />
+
+    <script id="prep">
+        var componentState = Object.freeze({
+            RUNNING: 0,
+            WAITING: 1,
+            FINISHED: 2,
+            ERROR: 3
+        });
+        var currentComponentState = componentState.WAITING;
+    </script>
+
+
+    <script id="Consent trial">
+        const browserCheck = {
+            type: jsPsychBrowserCheck,
+        };
+
+        const check_browser_trial = {
+            type: jsPsychCallFunction,
+            func: function () {
+                let message = '';
+                data = jsPsych.data.get().last(1).values()[0]
+                console.log(data)
+                if (data.mobile) {
+                    message = 'You must use a desktop/laptop computer to participate in this experiment';
+                    jatos.endStudy(false, message);
+                } else if (data.browser !== 'chrome' && data.browser != "edge-chromium") {
+                    message = 'You must use Chrome or Edge as your browser to complete this experimen'
+                    jatos.endStudy(false, message);
+                } else if (!data.fullscreen) {
+                    message = 'You need a browser that allows fullscreen mode'
+                    jatos.endStudy(false, message);
+                }
+            }
+        }
+
+        function consent_form() {
+            const html_consent = jatos.componentJsonInput.consentForm
+            return {
+                type: jsPsychSurveyHtmlForm,
+                preamble: '<h2>Informed Consent</h2>',
+                html: html_consent,
+                button_label: '',
+            }
+        }
+
+    </script>
+
+    <script id="Start">
+        let jsPsych = initJsPsych({
+            on_trial_start: jatos.addAbortButton,
+            on_finish: function () {
+                jatos.startNextComponent();
+            }
+        });
+
+        jatos.onLoad(function () {
+            let IPs = jatos.batchSession.get("IPs")
+            let currentIP = null
+
+            $.getJSON("https://api.ipify.org?format=json",
+                function (data) {
+                    currentIP = data.ip
+                })
+                .then(function () {
+                    if (IPs.includes(currentIP) && (jatos.batchJsonInput.IPreject || jatos.studyJsonInput.IPreject)) {
+                        jatos.endStudy(false,
+                            "You cannot participate more than once in this study. Please contact the researcher if you have any questions."
+                        );
+                    }
+                })
+
+
+
+            currentComponentState = componentState.RUNNING;
+            let timeline = [];
+            timeline.push(browserCheck);
+            timeline.push(check_browser_trial);
+            timeline.push(consent_form());
+            jsPsych.run(timeline);
+
+            jsPsych.data.addProperties({
+                ProlificID: jatos.urlQueryParameters.PROLIFIC_PID,
+                ProlificStudyID: jatos.urlQueryParameters.STUDY_ID,
+                ProlificSessionID: jatos.urlQueryParameters.SESSION_ID
+            });
+        });
+    </script>
+
+    </meta>
+</head>

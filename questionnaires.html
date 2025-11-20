@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <script src="https://unpkg.com/jspsych"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@1.1.3"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-survey@1.0.1"></script>
+    <link rel="stylesheet" href="https://unpkg.com/@jspsych/plugin-survey@1.0.1/css/survey.css">
+    <script src="libs/jquery-3.5.1.min.js"></script>
+    <script src="jatos.js"></script>
+
+    <script id="Experiment">
+        let jsPsych = initJsPsych({
+            on_finish: function () {
+                jatos.startNextComponent(jsPsych.data.get().json());
+            }
+        });
+
+        function onGroupSession(path, op) { }
+
+        function onOpen() {
+            timeline = [];
+            const trial = {
+                type: jsPsychSurvey,
+                survey_json: jatos.componentJsonInput
+            };
+
+            timeline.push(trial);
+            jsPsych.run(timeline);
+        }
+
+        function onMemberOpen(memberId) { }
+
+        function onMemberClose(memberId) {
+        }
+
+        function onMemberLeave(memberId) {
+        }
+
+        jatos.onLoad(function () {
+            jatos.joinGroup({
+                "onOpen": onOpen,
+                "onMemberOpen": onMemberOpen,
+                "onGroupSession": onGroupSession,
+                "onMemberClose": onMemberClose,
+                "onMemberLeave": onMemberLeave
+            });
+        });
+    </script>
+
+    </meta>
+</head>

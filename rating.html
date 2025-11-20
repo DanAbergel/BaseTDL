@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>Rating</title>
+
+    <script src="https://unpkg.com/jspsych"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@1.1.3"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-call-function@1.1.3"></script>
+
+    <link href="https://unpkg.com/jspsych@7.3.4/css/jspsych.css" rel="stylesheet" type="text/css">
+    <script src="https://unpkg.com/@jspsych/plugin-fullscreen@1.2.1"></script>
+    <script src="libs/jquery-3.5.1.min.js"></script>
+    <script src="jatos.js"></script>
+    <script src="utils.js"></script>
+    <script src="trials.js"></script>
+
+
+    <link rel="stylesheet" href="libs/pure-release-0.6.0/pure-min.css">
+    <link rel="stylesheet" type="text/css" href="css/styles.css" />
+
+    <script id="Variables">
+        let showLog = false;
+    </script>
+
+    <script id="Trials">
+        // Single Rating Trial
+        function singleRatingTrial(pair) {
+            let selected_value = -1;
+            let start_time = 0;
+            return {
+                type: jsPsychHtmlKeyboardResponse,
+                choices: "NO_KEYS",
+                stimulus: function () {
+                    const line_1 = getHtmlTag("div", "line", "line", "To what extent does the word");
+                    const line_2 = getHtmlTag("div", "cue", "cue", "<b>" + pair[0] + "</b>");
+                    const line_3 = getHtmlTag("div", "line", "line", "Remind you of the word");
+                    const line_4 = getHtmlTag("div", "association", "association", "<b>" + pair[1] + "</b>", {
+                        "style": "visibility:hidden"
+                    });
+                    const start_label = getHtmlTag("div", "scale_label", "start_scale_label", "0", {
+                        "style": "float:left"
+                    }
+                    );
+                    const end_label = getHtmlTag("div", "scale_label", "end_scale_label", "100", {
+                        "style": "float:right"
+                    });
+                    const scale = getHtmlTag("div", "scale", "scale", [start_label, end_label], { "style": "visibility:hidden" })
+
+                    return getScreen([line_1, line_2, line_3, line_4, scale], true, false);
+
+                },
+                data: {
+                    pair: pair
+                },
+                on_load: function () {
+                    start_time = performance.now();
+                    jsPsych.pluginAPI.setTimeout(function () {
+                        document.getElementById("association").style.visibility = "visible";
+                        document.getElementById("scale").style.visibility = "visible";
+                        document.getElementById('scale').addEventListener('click', function (event) {
+                            const scaleWidth = event.target.clientWidth; // Width of the scale
+                            const clickPosition = event.offsetX; // X-coordinate of the click relative to the scale
+                            selected_value = Math.round((clickPosition / scaleWidth) * 100); // Calculate the selected value   
+                            jsPsych.finishTrial()
+                        });
+                    }, 500)
+                },
+                on_finish: function (data) {
+                    data.selected_value = selected_value;
+                    data.rt = performance.now() - start_time;
+                }
+            };
+        }
+
+        function breakTrial() {
+            return {
+                type: jsPsychHtmlKeyboardResponse,
+                stimulus: function () {
+                    const break_html = getHtmlTag("div", "break", "break", "Break time! Please take a short break. The experiment will continue shortly.");
+                    return getScreen([break_html], true, false);
+                },
+                choices: "NO_KEYS",
+                trial_duration: parseInt(jatos.batchJsonInput.break_time || jatos.studyJsonInput.break_time || 10) * 1000,
+            };
+        }
+
+
+        // Rating Trials 
+        function ratingTrials() {
+            let trials = [];
+            const pRating_self = jatos.batchJsonInput.pRating_self || jatos.studyJsonInput.pRating_self || 1;
+            const pRating_sent = jatos.batchJsonInput.pRating_sent || jatos.studyJsonInput.pRating_sent || 1;
+            const pRating_other = jatos.batchJsonInput.pRating_other || jatos.studyJsonInput.pRating_other || 0.33;
+
+            // get current player as string
+            let current_player = jatos.groupMemberId.toString();
+            let other_players = jatos.groupMembers.filter((groupMemberId) => groupMemberId != current_player).toString();
+
+
+            let word_pairs_multi = jatos.groupSession.get(PAIRS_PROPERTY) || [];
+            if (showLog) console.log("all pairs: ", word_pairs_multi);
+
+            let word_pairs = removeDuplicates(word_pairs_multi);
+            word_pairs = word_pairs.filter((value) => !value.includes("NO RESPONSE"));
+            word_pairs = word_pairs.filter((value) => !value.slice(0, 3).includes("START"));
+            if (showLog) console.log("minus no_response & seed words: ", word_pairs);
+
+
+
+            let current_player_words = [];
+            let sent_player_words = [];
+            let other_player_words = [];
+            current_player_words = word_pairs.filter((value) => (value.slice(0, 3).includes(current_player)));
+            if (showLog) console.log("my words: ", current_player_words);
+            sent_player_words = word_pairs.filter((value) => (value.slice(3, 4).includes(current_player)));
+            if (showLog) console.log("sent words: ", sent_player_words);
+            other_player_words = word_pairs.filter((value) => (!value.includes(current_player)));
+            if (showLog) console.log("other words: ", other_player_words);
+
+
+            // let player1_words = word_pairs.filter((value) => value.includes(other_players[0]));
+            // let player2_words = word_pairs.filter((value) => value.includes(other_players[1]));
+            // let ai_words = word_pairs.filter((value) => value.includes("AI1") || value.includes("AI2"));
+
+            let adjust_pairs = [];
+
+            adjust_pairs = shuffle_seed(current_player_words).slice(0, Math.floor(pRating_self * current_player_words.length)).concat(shuffle_seed(sent_player_words).slice(0, Math.floor(pRating_sent * sent_player_words.length)), shuffle_seed(other_player_words).slice(0, Math.floor(pRating_other * other_player_words.length)));
+            if (showLog) console.log("all words: ", adjust_pairs);
+
+            let attention_checks = [["Attention", "middle", "CHECK", "CHECK"], ["Attention", "right", "CHECK", "CHECK"], ["Attention", "left", "CHECK", "CHECK"]];
+            let all_pairs = adjust_pairs.concat(attention_checks);
+            let all_pairs_shuffled = shuffle_seed(all_pairs);
+            if (showLog) console.log("all words final: ", all_pairs_shuffled);
+
+
+
+            let count_trials = 0;
+            for (let trial = 0; trial < all_pairs_shuffled.length; trial++) {
+                count_trials++;
+                trials.push(singleRatingTrial(all_pairs_shuffled[trial]));
+                if (count_trials % parseInt(jatos.batchJsonInput.rating_block_length || jatos.studyJsonInput.rating_block_length || 50) == 0) {
+                    trials.push(breakTrial());
+                }
+                if (count_trials % 5 == 0) {
+                    trials.push(getSendResults());
+                }
+            }
+            return trials;
+        }
+
+    </script>
+
+    <script id="Experiment">
+        let jsPsych = initJsPsych({
+            show_progress_bar: true,
+            on_finish: function () {
+                jatos.startNextComponent(jsPsych.data.get().json() + jsPsych.data.getInteractionData().json());
+            }
+        });
+
+        function onGroupSession(path, op) { }
+
+        function onOpen() {
+            showLog = jatos.batchJsonInput.showLog || jatos.studyJsonInput.showLog || false;
+
+            if (showLog) console.log("my id: ", jatos.groupMemberId);
+            timeline = [];
+            timeline.push(fullScreen_condition());
+            timeline.push(...ratingTrials());
+            jsPsych.run(timeline);
+        }
+
+        function onMemberOpen(memberId) { }
+
+        function onMemberClose(memberId) {
+        }
+
+        function onMemberLeave(memberId) {
+        }
+
+        jatos.onLoad(function () {
+            jatos.joinGroup({
+                "onOpen": onOpen,
+                "onMemberOpen": onMemberOpen,
+                "onGroupSession": onGroupSession,
+                "onMemberClose": onMemberClose,
+                "onMemberLeave": onMemberLeave
+            });
+        });
+    </script>
+
+    </meta>
+</head>

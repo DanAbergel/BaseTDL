@@ -1,0 +1,240 @@
+@import url('https://fonts.googleapis.com/css2?family=Lato&family=Open+Sans&display=swap');
+
+.sent-word {
+  font-family: 'Lato', sans-serif;
+}
+
+.received-word {
+  font-family: 'Open Sans', sans-serif;
+}
+
+.scale {
+  position: relative;
+  width: 300px;
+  height: 5px;
+  background-color: #ccc;
+  cursor: pointer;
+  padding: 5px;
+  border-radius: 10px;
+}
+
+.scale:hover {
+  background-color: #ddd;
+}
+
+.scale:hover::after {
+  visibility: visible;
+}
+
+.scale_label {
+  margin-top: 20px;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 20px;
+  color: #666;
+}
+
+.scale_label:first-child {
+  left: 0;
+}
+
+.scale_label:last-child {
+  right: 0;
+}
+
+.slow_error {
+  color: red;
+  font-size: 20px;
+  margin-top: 20px;
+}
+
+.error {
+  color: red;
+  font-size: 20px;
+  margin-top: 20px;
+}
+
+.other_word {
+  /* margin-bottom: 200px; */
+  font-size: 25px !important;
+}
+
+.word_input {
+  margin-top: 200px;
+  font-size: 25px !important;
+  font-weight: bold;
+  font-family: 'Roboto', sans-serif;
+}
+
+.fixation {
+  font-size: 50px;
+}
+
+.stimuli_word {
+  display: block;
+  /* or inline-block based on layout needs */
+  color: black;
+  /* Adjust color as needed */
+  font-size: 25px;
+  font-weight: bold;
+  /* Adjust font size */
+  /* Add any other necessary styling properties */
+}
+
+.stimuli_word.sent-word {
+  font-family: 'Lato', 'Arial', sans-serif;
+  font-style: italic;
+}
+
+.stimuli_word.received-word {
+  font-family: 'Open Sans', sans-serif;
+}
+
+.up_container {
+  display: block;
+  align-items: center;
+  justify-content: center;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  padding: 10px;
+  background-color: #f3f3f3;
+  box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.1);
+  font-size: 25px;
+  font-weight: bold;
+}
+
+.up_right_container {
+  display: block;
+  align-items: center;
+  justify-content: center;
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 30%;
+  padding: 10px;
+  background-color: #f3f3f3;
+  box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.1);
+  font-size: 25px;
+  font-weight: bold;
+}
+
+.up_left_container {
+  display: block;
+  align-items: center;
+  justify-content: center;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 30%;
+  padding: 10px;
+  background-color: #f3f3f3;
+  box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.1);
+  font-size: 25px;
+  font-weight: bold;
+}
+
+.left_container {
+  display: block;
+  align-items: center;
+  justify-content: center;
+  position: fixed;
+  top: 40%;
+  left: 0;
+  height: 100%;
+  padding: 10px;
+  background-color: #f3f3f3;
+  box-shadow: 2px 0px 5px rgba(0, 0, 0, 0.1);
+  font-size: 25px;
+  font-weight: bold;
+}
+
+.right_container {
+  display: block;
+  align-items: center;
+  justify-content: center;
+  position: fixed;
+  top: 40%;
+  right: 0;
+  height: 100%;
+  padding: 10px;
+  background-color: #f3f3f3;
+  box-shadow: -2px 0px 5px rgba(0, 0, 0, 0.1);
+}
+
+.gif_loader {
+  width: 100px;
+  height: 80px;
+}
+
+.down_container {
+  display: block;
+  align-items: center;
+  justify-content: center;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  padding: 10px;
+  background-color: #f3f3f3;
+  box-shadow: 0px -2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.down_left_container {
+  display: block;
+  align-items: center;
+  justify-content: center;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 30%;
+  padding: 10px;
+  background-color: #f3f3f3;
+  box-shadow: 0px -2px 5px rgba(0, 0, 0, 0.1);
+  font-size: 25px;
+  font-weight: bold;
+}
+
+.down_right_container {
+  display: block;
+  align-items: center;
+  justify-content: center;
+  position: fixed;
+  bottom: 0;
+  right: 0;
+  width: 30%;
+  padding: 10px;
+  background-color: #f3f3f3;
+  box-shadow: 0px -2px 5px rgba(0, 0, 0, 0.1);
+  font-size: 25px;
+  font-weight: bold;
+}
+
+
+.loading_player {
+  top: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.timer {
+  position: absolute;
+  top: 50px;
+  /* left: 550px; */
+  font-size: 50px;
+  font-weight: bold;
+  color: red;
+  text-align: center;
+  /* margin-top: 20px; */
+  /* margin-bottom: 20px; */
+}
+
+.avatar {
+  width: 100px;
+  height: 100px;
+  margin-right: 10px;
+}

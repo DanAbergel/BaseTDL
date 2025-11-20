@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+	<link rel="shortcut icon" type="image/png" href="favicon.ico">
+	<link rel="stylesheet" href="css/instructions.css" />
+	<link rel="stylesheet" href="libs/pure-release-0.6.0/pure-min.css">
+	<script src="libs/jquery-3.5.1.min.js"></script>
+	<script src="jatos.js"></script>
+</head>
+
+<body>
+
+	<p id="progressText"></p>
+
+	<div id="box">
+		<p id="error"></p>
+		<p id="text"></p>
+		<p id="moveSlidesText"></p>
+	</div>
+
+	<script>
+		var slideList;
+		var slideCount = 0;
+		var moveSlidesText;
+		var componentState = Object.freeze({
+			RUNNING: 0,
+			WAITING: 1,
+			FINISHED: 2,
+			ERROR: 3
+		});
+		var currentComponentState = componentState.WAITING;
+		var buttonEnabled = false
+		// What todo when jatos.js is finished initializing
+		jatos.onLoad(function () {
+			currentComponentState = componentState.RUNNING;
+			resetSlide();
+			startComponent();
+			if (jatos.componentJsonInput.abort) jatos.addAbortButton();
+		});
+
+		// What todo when key is pressed
+		$(document).keydown(function (event) {
+			// Do nothing if key is Shift, Control or Alt (AltGr doesn't seem to work)
+			if (event.ctrlKey || event.altKey || event.altGraphKey
+				|| event.shiftKey || buttonEnabled == false) {
+				return;
+			}
+
+			switch (currentComponentState) {
+				case componentState.RUNNING:
+					var keycode = (event.keyCode ? event.keyCode : event.which);
+					if (keycode == 39) {
+						// Arrow right
+						nextSlide();
+					} else if (keycode == 37) {
+						// Arrow left
+						previousSlide();
+					}
+					return;
+				case componentState.ERROR:
+					finishStudyWithError();
+					return;
+			}
+		});
+
+		function startComponent() {
+			slideList = jatos.componentJsonInput.slideList;
+			moveSlidesText = "Press &#x2192; to go to the next slide<br>"
+				+ "&#x2190; to go to the previous one";
+			displaySlide();
+		}
+
+		function displaySlide() {
+			var progressText = (slideCount + 1) + " of " + slideList.length
+				+ " slides";
+			var text = slideList[slideCount].text;
+			$("#moveSlidesText").html(moveSlidesText).hide();
+			$("#progressText").html(progressText).show();
+			$("#text").html(text).show();
+			if (!buttonEnabled) {
+				setTimeout(() => {
+					$("#moveSlidesText").html(moveSlidesText).show();
+					buttonEnabled = true;
+				}, 2000);
+			}
+		}
+
+		function nextSlide() {
+			slideCount++;
+			buttonEnabled = false;
+			if (slideCount == (slideList.length - 1)) {
+				moveSlidesText = "Press &#x2192; to START THE TASK<br>"
+					+ "&#x2190; to go to the previous one";
+				displaySlide();
+			} else if (slideCount < slideList.length) {
+				moveSlidesText = "Press &#x2192; to go to the next slide<br>"
+					+ "&#x2190; to go to the previous one";
+				displaySlide();
+			} else {
+				jatos.startNextComponent();
+			}
+		}
+
+		function previousSlide() {
+			if (slideCount > 0) {
+				slideCount--;
+				displaySlide();
+			}
+		}
+
+		function showError(errorMsg) {
+			resetSlide();
+			currentComponentState = componentState.ERROR;
+			window.errorMsg = errorMsg;
+			$("#error").html(errorMsg).show();
+		}
+
+		function resetSlide() {
+			$("#box").children().hide();
+		}
+
+		function finishStudyWithError() {
+			currentComponentState = componentState.FINISHED;
+			jatos.endComponent(false, window.errorMsg, jatos.endStudy(false,
+				window.errorMsg));
+		}
+
+		// What todo when jatos.js produces an error
+		jatos.onError(function (errorMsg) {
+			showError(errorMsg);
+		});
+
+	</script>
+</body>
+
+</html>

@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>Main</title>
+
+    <script src="https://unpkg.com/jspsych@7.3.4"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@1.1.3"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-call-function@1.1.3"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-html-button-response@1.1.3"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-html-slider-response@1.1.3"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-image-slider-response@1.1.3"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-survey-likert@1.1.3"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-fullscreen@1.2.1"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-instructions@1.1.3"></script>
+    <link href="https://unpkg.com/jspsych@7.3.4/css/jspsych.css" rel="stylesheet" type="text/css">
+
+    <script src="libs/jquery-3.5.1.min.js"></script>
+    <script src="jatos.js"></script>
+    <script src="utils.js"></script>
+    <script src="trials.js"></script>
+    <link rel="stylesheet" href="libs/pure-release-0.6.0/pure-min.css">
+    <link rel="stylesheet" type="text/css" href="css/styles.css" />
+
+    <script id="Variables">
+        let breakStates = []
+        let random_word = undefined;
+        let current_words = "";
+        let error_strike = 0;
+        let showLog = false;
+        let trials_number = 0;
+        let seed_words = [];
+        let maxTrials = 120;
+        let block = 0;
+        let firstTurn = 0;
+        let allAvatars = []
+        let seedN = 4;
+        let leavedPlayers = []
+        let allPlayers = [];
+        let botAnswer = false;
+        let avatarsCache = {};
+        let isTurnBased = false;
+        let break_duration = 0;
+    </script>
+
+
+    // Helper functions specific to the "Ostracized" mode logic.
+    <script id="Helpers_Ostracized">
+        function getSender(){
+            const gd = getGroupData();
+            return gd.length > 0 ? gd[gd.length - 1][0] : null;
+        }
+
+        function getReceiver(){
+            const gd = getGroupData();
+            return gd.length > 0 ? gd[gd.length - 1][1] : null;
+        }
+
+        function getLastWord(){
+            const gd = getGroupData();
+            return gd.length > 0 ? gd[gd.length - 1][2] : null
+        }
+    </script>
+
+    <script id="Functions">
+
+        /**
+         * Initializes the first word and turn for a new block.
+         * Ensures synchronization between all players and avoids race conditions
+         * by letting only one player start with a "START" entry.
+         */
+        function getInitializeBlock() {
+            console.log("######### INITIALIZE BLOC START ");
+            return {
+                type: jsPsychCallFunction,
+                func: function () {
+                    const group_data = getGroupData();
+
+                    // If this is the first player to start the block, add the seed word and define the first turn.
+                    if (group_data.length === 0) {
+                        addWord("START", firstTurn, seed_words[block])
+                            .catch((e) => {
+                                console.error("Error initializing block; Trying again, error:" + e);
+                            });
+                    } else {
+                        // If another player already started the block, synchronize to their assigned firstTurn.
+                        firstTurn = getReceiver();
+                    }
+                }
+            };
+        }
+
+
+        /*******************************************************
+         *  BOT MANAGEMENT HELPERS
+         * -----------------------------------------------------
+         * These functions handle fallback logic when players leave
+         * or when a bot is needed to simulate a response.
+         *******************************************************/
+
+
+        /*******************************************************
+         *  Generate Bot Random Word
+         * -----------------------------------------------------
+         * Returns a placeholder word for the bot.
+         * Can later be replaced by a word-generation algorithm.
+         *
+         * @returns {string} A placeholder response (currently "A").
+         *******************************************************/
+        function botRandomWord() {
+            return "A";
+        }
+
+        /*******************************************************
+         * ⚙ Bot Fallback Behavior
+         * -----------------------------------------------------
+         * Automatically adds a bot-generated response when:
+         *  - The current player has left (`isLeaver(turn)`).
+         *  - A bot is enabled (`botAnswer === true`).
+         *  - The current user is the manager (`iAmManager()`).
+         *
+         * This ensures the experiment continues smoothly
+         * even if a participant disconnects mid-turn.
+         *******************************************************/
+        function getBotCheckTrial() {
+            const turn = getReceiver();
+
+            if (botAnswer && isLeaver(turn) && iAmManager()) {
+                const candidates = getPresentMembers().filter(id => id !== turn);
+                if (candidates.length === 0) return; // No one left to send to
+
+                const next = candidates[Math.floor(Math.random() * candidates.length)];
+                const word = botRandomWord();
+
+                if (showLog) console.log(`[BOT] Simulating word "${word}" from ${turn} → ${next}`);
+
+                addWord(turn, next, word)
+                    .catch(err => console.error("[BOT ERROR] Failed to add bot word:", err));
+            }
+        }
+
+        function iAmManager(){
+            return getManagerID() === jatos.groupMemberId;
+        }
+
+
+        function ItsMyTurn() {
+            return getReceiver() === jatos.groupMemberId;
+        }
+
+
+
+    </script>
+
+    <script id="GET - Group Session">
+        // Function to get the words from the group session by the group member id
+        function getGroupData() {
+            return jatos.groupSession.get(GROUP_DATA) || [];
+        }
+
+
+
+        // Function to get the stimuli word and add it to the current words array
+
+        //TODO: change
+        //For example - create one vector of words, each element of the vector is a vector that has sending participants, receiving participant, word
+        //[[S1, S2, "table"],[S2, S3,"Chair"],[S3,S1,"Lamp"]]
+        function getStimuliWord(pointing = false) {
+            const group_data = getGroupData();
+            if (group_data.length % trials_number === 0 && pointing) {
+                return "";
+            }
+            const lastWord = getLastWord();
+            current_words = lastWord;
+
+            return lastWord === NO_RESPONSE ? NO_RESPONSE_TEXT : lastWord;
+        }
+
+    </script>
+
+    <script id="SET - Group Session">
+        // Function to add the word to the group session
+        async function addWord(group_member_id, next_member_id, word) {
+            let group_data = getGroupData();
+            let sender = getSender();
+
+            group_data.push([group_member_id, next_member_id, word]);
+
+            let pairs = jatos.groupSession.get(PAIRS_PROPERTY) || [];
+            pairs.push([current_words, word, group_member_id, sender]);
+            current_words = "";
+
+            const allocated_group = jatos.groupSession.get(ALLOCATED_GROUP_PROPERTY) || 1;
+
+            let properties = jatos.groupSession.getAll();
+            properties[ALLOCATED_GROUP_PROPERTY] = allocated_group;
+            properties[PAIRS_PROPERTY] = pairs;
+            properties[GROUP_DATA] = group_data;
+
+            await jatos.groupSession.setAll(properties);
+        }
+    </script>
+
+    <script id="Trials">
+
+        function getLoadingTrial() {
+            return {
+                type: jsPsychHtmlKeyboardResponse,
+                stimulus: function () {
+                    console.log("Step 2 in single block");
+                    const sender = getSender();
+                    const currentTurn = getReceiver();
+                    const lastWord = getLastWord();
+
+                    // Always derive fixed left/right order (sorted others)
+                    const othersSorted = getAllOtherPlayersIds();
+                    const leftId = othersSorted[0];
+                    const rightId = othersSorted[1];
+
+                    let leftPlayer = "";
+                    let rightPlayer = "";
+                    let arrow = "";
+
+                    if (currentTurn === leftId) {
+                        // It's the LEFT player's turn: show last word on the left; indicate origin on the right
+                        arrow = sender === rightId ? "⇐ " : ""; // came from right -> left
+                        leftPlayer = getSinglePlayerContainerGeneric(getAvatarSafe(leftId), "up_left_container", true, lastWord, false, "left");
+                        rightPlayer = getSinglePlayerContainerGeneric(getAvatarSafe(rightId), "up_right_container", false, arrow, false, "right");
+                    } else {
+                        // It's the RIGHT player's turn: show last word on the right; indicate origin on the left
+                        arrow = sender === leftId ? " ⇒" : ""; // came from left -> right
+                        leftPlayer = getSinglePlayerContainerGeneric(getAvatarSafe(leftId), "up_left_container", false, arrow, false, "left");
+                        rightPlayer = getSinglePlayerContainerGeneric(getAvatarSafe(rightId), "up_right_container", true, lastWord, false, "right");
+                    }
+                    return getScreen([leftPlayer, rightPlayer], false, true, [], othersSorted);
+                },
+                choices: "NO_KEYS",
+                on_load: function () {
+                    const group_data = getGroupData();
+                    const currentTurn = getReceiver();
+
+                    const checkInterval = setInterval(function () {
+                        const receiver = getReceiver();
+                        if (receiver !== currentTurn || receiver === jatos.groupMemberId || checkBreak() == true) {
+                            clearInterval(checkInterval);
+                            jsPsych.finishTrial();
+                        }
+                        if (iAmManager() && isLeaver(currentTurn)) {
+                            setTimeout(() => {
+                                getBotCheckTrial();
+                            }, 4000);
+                        }
+                    }, 10); // Check every 100 milisecond
+                },
+                on_finish: function (data) {
+                    const group_data = getGroupData();
+                    const lastWord = getLastWord();
+                    const currentTurn = getReceiver();
+                    const sender = getSender();
+                    data.trialIndex = group_data.length;
+                    data.entered_word = lastWord;
+                    data.current_turn = sender;
+
+                    data.next_turn = currentTurn;
+                    data.block = block;
+                }
+            }
+        }
+
+        // Before a break: if checkBreak() signals it's time for a break, return early.
+        // After a break: checkBreak() may still be true until new group data arrives, so use breakStates to detect just-exited break and avoid re-entering.
+        function shouldWait(){
+            return !ItsMyTurn() && (breakStates.at(-1) || !checkBreak());
+        }
+
+      /**
+       * Creates a looped trial that repeatedly shows the loading screen and runs the bot check
+       * while waiting for other players’ turns.
+       * The loop continues until it becomes the current player's turn.
+       */
+        function loadingLoop(idx) {
+            return {
+                // loop_function: Determines whether to stay in the loading loop.
+                // It is called after each iteration; if it returns true, the loop continues.
+                loop_function: shouldWait,
+                // timeline: The sequence of trials to run while waiting.
+                // 1. getLoadingTrial(): shows the loading screen while waiting.
+                // 2. conditionalPointingNode(): optionally shows pointing feedback if needed.
+                timeline: [getProgressLogTrial(idx), getLoadingTrial(), conditionalPointingNode()]
+            }
+        }
+
+      /**
+       * Determines whether to enter the loading loop at all.
+       * Only runs if it is not the current player's turn.
+       */
+        function conditionalLoadingLoop(idx) {
+            return {
+                // timeline: Contains the loading loop node, which will run if the condition below is met.
+                timeline: [loadingLoop(idx)],
+                // conditional_function: Determines whether to enter the loading loop at all.
+                // Returns true if it's not the current player's turn.
+                conditional_function: shouldWait
+            }
+        }
+
+        function conditionalPointingNode() {
+            return {
+                timeline: [getPointingTrialLoading()],
+                conditional_function: function () {
+                    // after break
+                    return getSender() === "START" && getReceiver() !== jatos.groupMemberId;
+                }
+            }
+        }
+
+        /*******************************************************
+         * CHECK BLOCK BREAK BY COUNT
+         * -----------------------------------------------------
+         * Detects if a block break should start based on trials:
+         *  - At least one trial was done
+         *  - Trial count is a multiple of `trials_number`
+         *  - Last sender did not leave
+         *******************************************************/
+        function checkBreak() {
+            const breakByCount = getGDLength() > 0 && getGDLength() % trials_number === 0 && !isLeaver(getSender());
+            // console.log("num_passes = ",getGDLength()," ,trials_number = ",trials_number," ,checkBreak = ",breakByCount);
+            return breakByCount;
+        }
+
+        function getPointingTrialLoading(trial, block) {
+            return {
+                type: jsPsychHtmlKeyboardResponse,
+                stimulus: function () {
+                    console.log("Step 3 in single block");
+                    const lastWord = getLastWord();
+                    const receiver = getReceiver();
+                    const sender = getSender();
+
+                    const otherPlayers = getAllOtherPlayersIds();
+                    let leftPlayer = "";
+                    let rightPlayer = "";
+
+                    if (sender === otherPlayers[0] && receiver === otherPlayers[1]) {
+                        const arrow = " ⇒";
+                        leftPlayer = getSinglePlayerContainerGeneric(getAvatarSafe(otherPlayers[0]), "up_left_container", true, (lastWord + arrow), true, "left");
+                        rightPlayer = getSinglePlayerContainerGeneric(getAvatarSafe(otherPlayers[1]), "up_right_container", false, undefined, false, "right");
+                        return getScreen([leftPlayer, rightPlayer], false, true, [], otherPlayers);
+                    }
+
+                    if (sender === otherPlayers[1] && receiver === otherPlayers[0]) {
+                        const arrow = "⇐ ";
+                        leftPlayer = getSinglePlayerContainerGeneric(getAvatarSafe(otherPlayers[0]), "up_left_container", false, undefined, false, "left");
+                        rightPlayer = getSinglePlayerContainerGeneric(getAvatarSafe(otherPlayers[1]), "up_right_container", true, (arrow + lastWord), true, "right");
+                        return getScreen([leftPlayer, rightPlayer], false, true, [], otherPlayers);
+                    }
+
+                    // Fallback: always return a valid (empty) screen to avoid "stimulus undefined" errors
+                    return getScreen([], false, true, [], otherPlayers);
+                },
+                choices: "NO_KEYS",
+                trial_duration: 1000
+            };
+        }
+
+        function getPointingTrial() {
+            return {
+                type: jsPsychHtmlKeyboardResponse,
+                stimulus: function () {
+                    const word = getStimuliWord(true);
+                    const word_html = getHtmlTag("div", "stimuli_word sent-word", "stimuli_word", word);
+                    const next_player = getReceiver();
+                    const otherPlayers = getAllOtherPlayersIds();
+                    const leftPlayer = otherPlayers[0];
+                    const arrow = next_player === leftPlayer ? "⇖" : "⇗";
+                    const arrow_html = getHtmlTag("div", "stimuli_word sent-word", "stimuli_word", arrow);
+                    const others = getAllOtherPlayersIds();
+                    return getScreen([arrow_html, word_html], false, false, [], others);
+                },
+
+                choices: "NO_KEYS",
+                trial_duration: 1000
+            };
+        }
+
+
+        /**
+         * Generates the Likert-scale questionnaire trials shown during breaks.
+         * Each question is displayed with the relevant player avatar and text prompt.
+         */
+        // function getQuestionsTrial() {
+        //     const scales = ["Not at all", "A little bit", "Moderately", "To some extent", "A lot"];
+        //     const scaleWidth = 10;
+        //
+        //     // Helper to build a single Likert question with an optional avatar
+        //     const makeQuestion = (imgSrc, text, name) => ({
+        //         type: jsPsychSurveyLikert,
+        //         questions: [{
+        //             prompt: getScreen(getHtmlTag("div", "", "", `
+        //         <div style="text-align: center;">
+        //             ${imgSrc ? `<img src="${imgSrc}" alt="Player Avatar" style="max-width:150px;margin-bottom:15px;">` : ""}
+        //             <p>To what extent do you identify with the following statement:</p>
+        //             <p><b>${text}</b></p>
+        //         </div>
+        //     `)),
+        //             labels: scales,
+        //             required: true,
+        //             scale_width: scaleWidth,
+        //             name
+        //         }]
+        //     });
+        //
+        //     // Build all questions in one array
+        //     return [
+        //         makeQuestion(null, "I enjoy the game so far", "enjoy"),
+        //         makeQuestion(allAvatars[0], "I feel in-sync with this other player", "sync1"),
+        //         makeQuestion(allAvatars[1], "I feel in-sync with this other player", "sync2"),
+        //         makeQuestion(allAvatars[0], "So far, I like this other player", "like1"),
+        //         makeQuestion(allAvatars[1], "So far, I like this other player", "like2"),
+        //         makeQuestion(allAvatars[0], "So far, I feel that this player likes me", "fond1"),
+        //         makeQuestion(allAvatars[1], "So far, I feel that this player likes me", "fond2"),
+        //     ];
+        // }
+
+        function getMainTrialBlock() {
+            let timeline_temp = [getProgressLogTrial(), getCountdownTrial(), ...getWordExchangeTrial(), getPointingTrial()]
+            return {
+                timeline: timeline_temp,
+                conditional_function: function () {
+                    return (breakStates.at(-1) || !checkBreak());
+                }
+            }
+        }
+        //
+        // function changeBlock() {
+        //   return {
+        //     type: jsPsychCallFunction,
+        //     func: function () {
+        //       // Advance the local block counter
+        //         block = block + 1;
+        //     }
+        //   }
+        // }
+
+
+        /**
+         * Handles what happens during breaks between blocks.
+         * Detects when a break is needed, shows the break screen and questions,
+         * and advances or resets block state to keep all players synchronized.
+         */
+        function getBreakCondition() {
+            /*******************************************************
+             * 💤 BREAK TRIAL
+             * -----------------------------------------------------
+             * Displays a break message for a short rest period.
+             * Automatically resumes after `break_duration`.
+             *******************************************************/
+            const breakTrial = () => ({
+                type: jsPsychHtmlKeyboardResponse,
+                fullscreen_mode: true,
+                stimulus: "Break time! Please take a short break. The experiment will continue shortly.",
+                choices: "NO_KEYS",
+                trial_duration: break_duration,
+            });
+            return {
+                timeline: [
+                    updateGroupSessionTrial(jatos.groupMemberId+COMPLETE_BREAK_EXTENTION,"entered"),
+                    changeBlock(),
+                    breakTrial(),
+                    ...getQuestionsTrial(),
+                    getInitializeBlock(),
+                    updateGroupSessionTrial(jatos.groupMemberId+COMPLETE_BREAK_EXTENTION,"finished"),
+                    getAllFinishParamTrial(
+                        COMPLETE_BREAK_EXTENTION,
+                        "Waiting for the other player to finish the break section.",
+                        "finished",
+                        true,
+                        0
+                    )                ],
+                conditional_function: () => {
+                    const shouldBreak = checkBreak();
+                    breakStates.push(shouldBreak);
+                    return shouldBreak;
+                },
+            }
+        }
+
+
+/**
+ * Calculates the number of valid game data entries in the group session.
+ *
+ * The function counts the number of "START" and non-"START" entries in the
+ * group data array, but avoids double-counting consecutive "START" markers.
+ *
+ * It delegates sub-tasks to helper functions for clarity:
+ * - `isStartEntry(entry)`: checks if an entry marks the start of a block.
+ * - `incrementCount(entry, lastWasStart)`: decides whether to increment the counter.
+ *
+ * @returns {number} The total number of counted entries, excluding duplicate START markers.
+ */
+function getGDLength() {
+    const gd = getGroupData();
+
+    /**
+     * Determines if a given entry corresponds to the start of a new block.
+     * @param {Array} entry - A [sender, receiver, word] tuple from the group data.
+     * @returns {boolean} True if the entry is a "START" marker.
+     */
+    const isStartEntry = (entry) => entry[0] === "START";
+
+    /**
+     * Decides whether to increment the count based on current and previous states.
+     * @param {boolean} isStart - Whether the current entry is a START.
+     * @param {boolean} lastWasStart - Whether the previous entry was a START.
+     * @returns {boolean} True if the counter should increment for this entry.
+     */
+    const shouldIncrement = (isStart, lastWasStart) => {
+        return (isStart && !lastWasStart) || !isStart;
+    };
+
+    let count = 0;
+    let lastWasStart = false;
+
+    // Iterate over group data to count valid entries
+    for (const entry of gd) {
+        const startFlag = isStartEntry(entry);
+        if (shouldIncrement(startFlag, lastWasStart)) {
+            count++;
+        }
+        lastWasStart = startFlag;
+    }
+
+    return count;
+}
+
+        function getProgressLogTrial(idx){
+            return {
+                type: jsPsychCallFunction,
+                func: function(){
+                }
+            }
+        }
+
+    </script>
+
+    <script id="Experiment">
+        let jsPsych = initJsPsych({
+            on_finish: function () {
+                jatos.startNextComponent("START_FINAL" + jsPsych.data.get().json() + "END_FINAL");
+            }
+        });
+
+
+        function onGroupSession(path, op) { }
+
+        /**
+         * Initializes global session and configuration variables for the experiment.
+         *
+         * This function retrieves key parameters from the JATOS group session
+         * and from the batch or study JSON input. It prepares global state variables
+         * such as participant IDs, group configuration, trial parameters, and
+         * experiment mode before the experiment starts.
+         *
+         * Steps performed:
+         *  1. Load group-related variables (leavedPlayers, allPlayers, mode).
+         *  2. Extract experiment parameters (seedN, showLog, trials_number, maxTrials, botAnswer)
+         *     from batchJsonInput or studyJsonInput.
+         *  3. Log initialization details for debugging.
+         *
+         * @global leavedPlayers {Array<string>} - IDs of players who have left the group.
+         * @global allPlayers {Array<string>} - IDs of all players in the group.
+         * @global mode {string} - Current experiment mode, such as 'debug' or 'normal'.
+         * @global seedN {number} - Number of seed words used to initialize the game.
+         * @global showLog {boolean} - Whether to print debug logs in the console.
+         * @global trials_number {number} - Number of trials in each block.
+         * @global maxTrials {number} - Total number of trials in the experiment.
+         * @global botAnswer {boolean} - Whether a bot will simulate responses for missing players.
+         *
+         * @returns {void}
+         */
+        function initializeSessionVariables() {
+            // Retrieve players who have left the group session
+            leavedPlayers = jatos.groupSession.get(LEAVED_PLAYERS_PROPERTY);
+            // Retrieve all players in the group session
+            allPlayers = jatos.groupSession.get(ALL_MEMBER_IDS_PROPERTY);
+            // Retrieve the experiment mode (e.g., normal, debug, etc.)
+            mode = jatos.groupSession.get(MODE_PROPERTY);
+
+            // Use a single reference for batch or study JSON inputs, fallback to empty object if neither is set
+            const cfg = jatos.batchJsonInput || jatos.studyJsonInput || {};
+
+            // Number of seed words used in the experiment (default: 4)
+            seedN = cfg.seedN || 4;
+            // Enable or disable detailed logging in the console (default: false)
+            showLog = cfg.showLog || false;
+            // Number of trials (default: 8)
+            trials_number = cfg.trials_number || 8;
+            // Maximum number of trials in the experiment (default: 120)
+            maxTrials = cfg.maxTrials || 120;
+            // Whether a bot should answer for absent players (default: false)
+            botAnswer = cfg.botAnswer || false;
+            // Retrieve and cache avatars for all other players (supports any group size)
+            const others = getAllOtherPlayersIds();
+            allAvatars = others.map(id => getAvatarSafe(id));
+            // Shuffle the list of seed words to create randomized block order
+            seed_words = shuffle_seed(jatos.groupSession.get(SEED_WORDS_PROPERTY) || []);
+            // Duration of the break between blocks (default: 15 seconds)
+            break_duration = jatos.batchJsonInput.break_duration || jatos.studyJsonInput.break_duration || 15 * 1000
+
+            // ==========================================================
+            // Randomization and avatar cache initialization
+            // ==========================================================
+            // Preload and cache avatar filenames for all players.
+            // This allows avatars to remain visible even if a player disconnects later.
+            (allPlayers || []).forEach(id => {
+                const f = jatos.groupSession.get(id + RANDOM_AVATAR_EXTENSION);
+                if (f) avatarsCache[id] = f;
+            });
+
+            // -----------------------------------------------------------
+            // Mode-specific variable initialization
+            // -----------------------------------------------------------
+            // This section sets up special configuration variables depending
+            // on the experimental mode. Some modes require the game to follow
+            // a specific structure or timing logic.
+            //
+            // Example:
+            // - MODE_OSTRACIZED → activates turn-based gameplay.
+            // - MODE_ODDBALL → (placeholder for future logic or behavior).
+            if (mode === MODE_OSTRACIZED) {
+                // In ostracized mode, the game is played turn by turn
+                // rather than allowing simultaneous actions.
+                isTurnBased = true;
+                // Randomly select the first player to start the game.
+                // The order is determined using a deterministic shuffle based on the first group member as seed,
+                // ensuring all participants get the same random order.
+                firstTurn = shuffle_seed(jatos.groupMembers, jatos.groupMembers[0])[0];
+            } else if (mode === MODE_ODDBALL) {
+                // Oddball mode may require specific parameters or
+                // behaviors that will be defined later.
+            }
+
+
+            // ==========================================================
+            // Structured debug logs
+            // ==========================================================
+            if (showLog) {
+                console.groupCollapsed("%c[INITIALIZATION SUMMARY]", "color: #2e86de; font-weight: bold;");
+                console.table({
+                    "Mode": mode,
+                    "Seed words count": seed_words.length,
+                    "Num Trials": trials_number,
+                    "Max trials": maxTrials,
+                    "Bot active": botAnswer,
+                    "Seed N": seedN,
+                    "First turn": firstTurn,
+                    "All players": allPlayers ? allPlayers.join(", ") : "N/A",
+                    "Leaved players": leavedPlayers ? leavedPlayers.join(", ") : "None",
+                    "Cached avatars": Object.keys(avatarsCache).length
+                });
+                console.groupEnd();
+            }
+        }
+
+          function onOpen() {
+              // Initialize all global session variables and configuration parameters
+              initializeSessionVariables()
+
+              let timeline = [];
+              if(isTurnBased){
+                  timeline.push(getInitializeBlock());
+              }
+              for (let i = 1; i < maxTrials; i++) {
+                  if (i % 3 === 0){
+                      timeline.push(getSendResults());
+                  }
+                  // displays waiting screen if it does not your turn
+                  timeline.push(conditionalLoadingLoop(i));
+                  // run when it's your turn
+                  timeline.push(getMainTrialBlock());
+                  timeline.push(getBreakCondition());
+              }
+
+              // Directly run the experiment without waiting for any Promise
+              jsPsych.run(timeline);
+
+              // Add metadata to the jsPsych dataset
+              jsPsych.data.addProperties({
+                  groupAllocation: jatos.groupSession.get(ALLOCATED_GROUP_PROPERTY),
+                  ProlificID: jatos.urlQueryParameters.PROLIFIC_PID,
+                  ProlificStudyID: jatos.urlQueryParameters.STUDY_ID,
+                  ProlificSessionID: jatos.urlQueryParameters.SESSION_ID
+              });
+          }
+
+        function onMemberOpen(memberId) { }
+
+        function onMemberClose(memberId) {
+            if (showLog) console.log(`Player ${memberId} close`)
+            onOtherPlayerDrop();
+        }
+
+        function  onMemberLeave(memberId) {
+            leavedPlayers.push(memberId);
+            if (showLog) console.log(`Player id ${memberId} has been added to leavedPlayers`);
+            onOtherPlayerDrop(undefined, 0, botAnswer);
+        }
+
+        function printError(errorMsg) {
+            if (showLog) console.log(errorMsg);
+        }
+
+        function onClose(){}
+
+        jatos.onLoad(function () {
+            jatos.joinGroup({
+                "onOpen": onOpen,
+                "onMemberOpen": onMemberOpen,
+                "onGroupSession": onGroupSession,
+                "onMemberClose": onMemberClose,
+                "onMemberLeave": onMemberLeave,
+                "onError": printError,
+                "onClose": onClose,
+            });
+        });
+    </script>
+
+    </meta>
+</head>

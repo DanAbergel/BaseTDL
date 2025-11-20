@@ -1,0 +1,549 @@
+{
+    "showQuestionNumbers": false,
+    "title": "Questionnaires",
+    "pages": [
+        {
+            "elements": [
+                {
+                    "type": "matrix",
+                    "name": "NTS",
+                    "title": "Please rate the following statements based on your level of agreement",
+                    "alternateRows": true,
+                    "isAllRowRequired": true,
+                    "rows": [
+                        {
+                            "text": "During the game I felt good about myself",
+                            "value": "NTS1"
+                        },
+                        {
+                            "text": "I felt that the other participants failed to perceive me as a worthy and likeable person",
+                            "value": "NTS2"
+                        },
+                        {
+                            "text": "I felt somewhat inadequate during the game",
+                            "value": "NTS3"
+                        },
+                        {
+                            "text": "I felt poorly accepted by the other participants",
+                            "value": "NTS4"
+                        },
+                        {
+                            "text": "I felt as though I had made a 'connection' or bonded with one or more of the participants during the game.",
+                            "value": "NTS5"
+                        },
+                        {
+                            "text": "I felt like an outsider during the game",
+                            "value": "NTS6"
+                        },
+                        {
+                            "text": "I felt that I was able to write an association as often as I wanted during the game",
+                            "value": "NTS7"
+                        },
+                        {
+                            "text": "I felt somewhat frustrated during the game",
+                            "value": "NTS8"
+                        },
+                        {
+                            "text": "I felt in control during the game",
+                            "value": "NTS9"
+                        },
+                        {
+                            "text": "I felt that my performance [e.g. writing an assocation, deciding whom to pass the association to] had some effect on the direction of the game",
+                            "value": "NTS10"
+                        },
+                        {
+                            "text": "I felt non-existent during the game",
+                            "value": "NTS11"
+                        },
+                        {
+                            "text": "I felt as though my existence was meaningless during the game",
+                            "value": "NTS12"
+                        }
+                    ],
+                    "columns": [
+                        {
+                            "value": 1,
+                            "text": "Not At All"
+                        },
+                        {
+                            "value": 2,
+                            "text": "A Little Bit"
+                        },
+                        {
+                            "value": 3,
+                            "text": "Somewhat"
+                        },
+                        {
+                            "value": 4,
+                            "text": "Very Much"
+                        },
+                        {
+                            "value": 5,
+                            "text": "Extremely"
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "elements": [
+                {
+                    "type": "matrix",
+                    "name": "UAA",
+                    "title": "Please rate the following statements based on your level of agreement",
+                    "alternateRows": true,
+                    "isAllRowRequired": true,
+                    "rows": [
+                        {
+                            "text": "I tried to figure out what the other players were thinking",
+                            "value": "UAA1"
+                        },
+                        {
+                            "text": "I tried to understand what made the other players write certain associations",
+                            "value": "UAA2"
+                        },
+                        {
+                            "text": "I tried to understand why and when a player decided to send their associations to me",
+                            "value": "UAA3"
+                        },
+                        {
+                            "text": "I tried to understand the thoughts, desires, and feelings that led the people I was just interacting with to their behavior",
+                            "value": "UAA4"
+                        },
+                        {
+                            "text": "I felt that the other players liked me",
+                            "value": "UAA5"
+                        },
+                        {
+                            "text": "I felt that the other players tried to understand what I was thinking",
+                            "value": "UAA6"
+                        },
+                        {
+                            "text": "I felt that the other players tried to understand what made me write certain associations",
+                            "value": "UAA7"
+                        },
+                        {
+                            "text": "I felt confident that I understood the thoughts, desires, and feelings of the people I was just interacting with",
+                            "value": "UAA8"
+                        }
+                    ],
+                    "columns": [
+                        {
+                            "value": 1,
+                            "text": "Not At All"
+                        },
+                        {
+                            "value": 2,
+                            "text": "A Little Bit"
+                        },
+                        {
+                            "value": 3,
+                            "text": "Somewhat"
+                        },
+                        {
+                            "value": 4,
+                            "text": "Very Much"
+                        },
+                        {
+                            "value": 5,
+                            "text": "Extremely"
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "elements": [
+                {
+                    "type": "matrix",
+                    "name": "MS1",
+                    "title": "Someone jumps in front of you on the grocery line and says, 'I'm in a rush.'",
+                    "alternateRows": true,
+                    "isAllRowRequired": true,
+                    "rows": [
+                        {
+                            "text": "Did that person jump in front of you on purpose?",
+                            "value": "MS1a"
+                        },
+                        {
+                            "text": "I tried to understand what made the other players write certain associations",
+                            "value": "UAA2"
+                        },
+                        {
+                            "text": "I tried to understand why and when a player decided to send their associations to me",
+                            "value": "UAA3"
+                        }
+                    ],
+                    "columns": [
+                        {
+                            "value": 1,
+                            "text": "Not At All"
+                        },
+                        {
+                            "value": 2,
+                            "text": "A Little Bit"
+                        },
+                        {
+                            "value": 3,
+                            "text": "Somewhat"
+                        },
+                        {
+                            "value": 4,
+                            "text": "Very Much"
+                        },
+                        {
+                            "value": 5,
+                            "text": "Extremely"
+                        }
+                    ]
+                },
+                {
+                    "type": "matrix",
+                    "name": "MS2",
+                    "title": "Please rate the following statements based on your level of agreement",
+                    "alternateRows": true,
+                    "isAllRowRequired": true,
+                    "rows": [
+                        {
+                            "text": "I tried to figure out what the other players were thinking",
+                            "value": "UAA1"
+                        },
+                        {
+                            "text": "I tried to understand what made the other players write certain associations",
+                            "value": "UAA2"
+                        },
+                        {
+                            "text": "I tried to understand why and when a player decided to send their associations to me",
+                            "value": "UAA3"
+                        }
+                    ],
+                    "columns": [
+                        {
+                            "value": 1,
+                            "text": "Not At All"
+                        },
+                        {
+                            "value": 2,
+                            "text": "A Little Bit"
+                        },
+                        {
+                            "value": 3,
+                            "text": "Somewhat"
+                        },
+                        {
+                            "value": 4,
+                            "text": "Very Much"
+                        },
+                        {
+                            "value": 5,
+                            "text": "Extremely"
+                        }
+                    ]
+                },
+                {
+                    "type": "matrix",
+                    "name": "MS3",
+                    "title": "Please rate the following statements based on your level of agreement",
+                    "alternateRows": true,
+                    "isAllRowRequired": true,
+                    "rows": [
+                        {
+                            "text": "I tried to figure out what the other players were thinking",
+                            "value": "UAA1"
+                        },
+                        {
+                            "text": "I tried to understand what made the other players write certain associations",
+                            "value": "UAA2"
+                        },
+                        {
+                            "text": "I tried to understand why and when a player decided to send their associations to me",
+                            "value": "UAA3"
+                        }
+                    ],
+                    "columns": [
+                        {
+                            "value": 1,
+                            "text": "Not At All"
+                        },
+                        {
+                            "value": 2,
+                            "text": "A Little Bit"
+                        },
+                        {
+                            "value": 3,
+                            "text": "Somewhat"
+                        },
+                        {
+                            "value": 4,
+                            "text": "Very Much"
+                        },
+                        {
+                            "value": 5,
+                            "text": "Extremely"
+                        }
+                    ]
+                },
+                {
+                    "type": "matrix",
+                    "name": "MS4",
+                    "title": "Please rate the following statements based on your level of agreement",
+                    "alternateRows": true,
+                    "isAllRowRequired": true,
+                    "rows": [
+                        {
+                            "text": "I tried to figure out what the other players were thinking",
+                            "value": "UAA1"
+                        },
+                        {
+                            "text": "I tried to understand what made the other players write certain associations",
+                            "value": "UAA2"
+                        },
+                        {
+                            "text": "I tried to understand why and when a player decided to send their associations to me",
+                            "value": "UAA3"
+                        }
+                    ],
+                    "columns": [
+                        {
+                            "value": 1,
+                            "text": "Not At All"
+                        },
+                        {
+                            "value": 2,
+                            "text": "A Little Bit"
+                        },
+                        {
+                            "value": 3,
+                            "text": "Somewhat"
+                        },
+                        {
+                            "value": 4,
+                            "text": "Very Much"
+                        },
+                        {
+                            "value": 5,
+                            "text": "Extremely"
+                        }
+                    ]
+                },
+                {
+                    "type": "matrix",
+                    "name": "MS5",
+                    "title": "Someone jumps in front of you on the grocery line and says, 'I'm in a rush.'",
+                    "alternateRows": true,
+                    "isAllRowRequired": true,
+                    "rows": [
+                        {
+                            "text": "Did that person jump in front of you on purpose?",
+                            "value": "UAA1"
+                        }
+                    ],
+                    "columns": [
+                        {
+                            "value": 1,
+                            "text": "Definitely No"
+                        },
+                        {
+                            "value": 2,
+                            "text": "Probably No"
+                        },
+                        {
+                            "value": 3,
+                            "text": "Maybe No"
+                        },
+                        {
+                            "value": 4,
+                            "text": "Maybe Yes"
+                        },
+                        {
+                            "value": 5,
+                            "text": "Probably Yes"
+                        },
+                        {
+                            "value": 5,
+                            "text": "Definitely Yes"
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}
+
+
+
+
+
+{
+    "questions": [
+        {
+            "type": "dropdown",
+            "name": "gender",
+            "title": "Gender:",
+            "isRequired": true,
+            "colCount": 0,
+            "choices": [
+                "Male",
+                "Female",
+                "Other",
+                "Prefer not to say"
+            ]
+        },
+        {
+            "name": "Age",
+            "type": "text",
+            "inputType": "number",
+            "title": "Age:",
+            "isRequired": true
+        },
+        {
+            "type": "dropdown",
+            "name": "education",
+            "title": "Highest degree or level of education you have completed:",
+            "isRequired": true,
+            "colCount": 0,
+            "choices": [
+                "Primary school/Elementary school",
+                "Secondary school/Highschool",
+                "Level 4+ qualification/Associate's degree/Vocational qualifications",
+                "Bachelor's degree",
+                "Master's degree",
+                "PhD/Doctorate+",
+                "Prefer not to say"
+            ]
+        },
+        {
+            "name": "Birth",
+            "type": "text",
+            "inputType": "text",
+            "title": "Country of birth:",
+            "isRequired": true
+        },
+        {
+            "name": "primary",
+            "type": "text",
+            "inputType": "text",
+            "title": "Country of primary/elementary education:",
+            "isRequired": true
+        },
+        {
+            "name": "secondary",
+            "type": "text",
+            "inputType": "text",
+            "title": "Country of secondary education/high school:",
+            "isRequired": true
+        },
+        {
+            "name": "languages",
+            "type": "comment",
+            "title": "Proficiency in languages (please list all language + level of proficieny - basic/fluent/native):",
+            "isRequired": true,
+            "rows": 3,
+            "autoGrow": true
+        }
+    ]
+}
+// 1.
+ 1. Someone jumps in front of you on the grocery line and says,
+"I'm in a rush."
+A. What do you think was the real reason why someone jumped in line in front of you?
+ ________________________________________________________
+ B. Did that person jump in front of you on purpose?
+ 1 2 3 4 5 6
+ Definitely Probably Maybe Maybe Probably Definitely
+ No No No Yes Yes Yes
+
+ C. How angry would this make you feel?
+ 1 2 3 4 5
+ Not at Very
+ all Angry Angry
+ D. How much would you blame that person for jumping in front of you on line?
+ 1 2 3 4 5
+ Not at Very
+ All Much
+E. What would you do about it?
+____________________________________________________________
+
+//7.
+Your neighbors are playing loud music. You knock on the door and ask them to turn it down. Fifteen
+minutes later, the music is loud again.
+A. What do you think was the real reason why your neighbors made the music loud again?
+_______________________________________________________
+B. Do you think your neighbors raised the music on purpose?
+ 1 2 3 4 5 6
+ Definitely Probably Maybe Maybe Probably Definitely
+ No No No Yes Yes Yes
+
+ C. How angry would this make you feel?
+ 1 2 3 4 5
+ Not at Very
+ all Angry Angry
+ D. How much would you blame them for raising the music again?
+ 1 2 3 4 5
+ Not at Very
+ All Much
+E. What would you do about it?
+ _____________________________________________________
+
+// 8.
+ You walk past a bunch of teenagers at a mall and your hear them start to laugh.
+
+A. What do think was the real reason why the teenagers started to laugh after you walked past them?
+ ________________________________________________________
+ B. Do you think the teenagers did this to you on purpose?
+ 1 2 3 4 5 6
+ Definitely Probably Maybe Maybe Probably Definitely
+ No No No Yes Yes Yes
+
+ C. How angry would this make you feel?
+ 1 2 3 4 5
+ Not at Very
+ all Angry Angry
+ D. How much would you blame the teenagers for laughing as you walked past them?
+ 1 2 3 4 5
+ Not at Very
+ All Much
+E. What would you do about it?
+ ________________________________________________________
+
+
+//  9.
+  While driving, the person in the car behind you honks their horn and then cuts you off.
+A. What do you think was the real reason why the person cut you off while driving?
+_____________________________________________________
+B. Do you think the person cut you off on purpose?
+ 1 2 3 4 5 6
+ Definitely Probably Maybe Maybe Probably Definitely
+ No No No Yes Yes Yes
+
+ C. How angry would this make you feel?
+ 1 2 3 4 5
+ Not at Very
+ all Angry Angry
+ D. How much would you blame the driver of the car for cutting you off on the road?
+ 1 2 3 4 5
+ Not at Very
+ All Much
+E. What would you do about it?
+
+
+
+// 10. 
+You are supposed to meet a new friend for lunch at a restaurant but she/he never shows up.
+
+A. What do you think was the real reason why your new friend didn’t show up at the restaurant?
+ ________________________________________________________
+ B. Do you think your new friend did this to you on purpose?
+ 1 2 3 4 5 6
+ Definitely Probably Maybe Maybe Probably Definitely
+ No No No Yes Yes Yes
+
+ C. How angry would this make you feel?
+ 1 2 3 4 5
+ Not at Very
+ all Angry Angry
+ D. How much would you blame your new friend for not showing up at the restaurant?
+ 1 2 3 4 5
+ Not at Very
+ All Much
+E. What would you do about it? 

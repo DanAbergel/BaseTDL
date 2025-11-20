@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Main</title>
+
+    <script src="https://unpkg.com/jspsych@7.3.4"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@1.1.3"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-call-function@1.1.3"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-html-button-response@1.1.3"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-html-slider-response@1.1.3"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-image-slider-response@1.1.3"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-survey-likert@1.1.3"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-fullscreen@1.2.1"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-instructions@1.1.3"></script>
+    <link href="https://unpkg.com/jspsych@7.3.4/css/jspsych.css" rel="stylesheet" type="text/css">
+
+    <script src="libs/jquery-3.5.1.min.js"></script>
+    <script src="jatos.js"></script>
+    <script src="utils.js"></script>
+    <script src="trials.js"></script>
+    <link rel="stylesheet" href="libs/pure-release-0.6.0/pure-min.css">
+    <link rel="stylesheet" type="text/css" href="css/styles.css" />
+
+    <script id="Helpers">
+        /*******************************************************
+         * CHECK BLOCK BREAK BY COUNT
+         * -----------------------------------------------------
+         * Detects if a block break should start based on trials:
+         *  - At least one trial was done
+         *  - Trial count is a multiple of `trials_number`
+         *  - Last sender did not leave
+         *******************************************************/
+        function checkBreak() {
+            return getGDLength() > 0 && getGDLength() % trials_number === 0 && !isLeaver(getSender());
+        }
+    </script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  </head>
+<body>
+
+</body>
+</html>
