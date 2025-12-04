@@ -27,8 +27,6 @@
         let showLog = false;
 
         // BOT Variables
-        let leavedPlayers = []
-        let allPlayers = [];
         let botActive = false;
         let associationsPerBreak = 0;
         let words_list = [];
@@ -49,7 +47,6 @@
          *  - The last sender is still active (not a leaver)
          *******************************************************/
         function checkBreak() {
-            console.log("assocIndex = ",assocIndex , "associationsPerBreak = ",associationsPerBreak);
             return assocIndex % associationsPerBreak === 0;
         }
 
@@ -74,7 +71,7 @@
                 function () {
                     return getScreen([
                     text + " <img src='" +
-                    getAvatarById(id) +
+                    getRandomAvatarById(id) +
                     "' style='width: 50px; height: 50px;'>"
                 ]);
             };
@@ -86,15 +83,43 @@
             createLikertTrial(base("To what extent do you identify with the following statement:<br><b>So far, I like</b>", ids[1]), "like_" + ids[1])
         ];
     }
+
+        /**
+         * SYNC PLAYERS TRIAL
+         * ---------------------------------------------------------
+         * This function creates a synchronization point after each
+         * word association. It:
+         *   1. Displays the target word and the current player's
+         *      submitted response (read‑only).
+         *   2. Waits until *all* players have written their value
+         *      to groupSession under the key "<playerId>_<word>".
+         *   3. Uses getAllFinishParamTrial to block progression
+         *      until every participant has finished this step.
+         *
+         * In short: this is a synchronization barrier that ensures
+         * everyone has answered before moving on to the next trial.
+         */
+        function syncPlayers(word) {
+            const stimulus = () => {
+                let assocs = {};
+                const allPlayers = getAllOtherPlayersIds();
+                allPlayers.forEach(pid => {
+                    const key = pid + "_" + word;
+                    assocs[key] = jatos.groupSession.get(key) || "";
+                });
+                console.log(assocs);
+                const stimulusDiv = getHtmlTag("div", "stimuli_word", "stimuli_word", word);
+                const myValue = assocs[jatos.groupMemberId + "_" + word] || "";
+                const myInput = getHtmlTag("input", "word_input", null, null, { value: myValue, disabled: true });
+                return getScreen([stimulusDiv, myInput], false, true);
+            };
+
+            return getAllFinishParamTrial("_" + word, "", "*", true, 600, stimulus);
+        }
     </script>
 
     <script id="Helpers">
         function initializeSessionVariables() {
-            // Retrieve players who have left the group session
-            leavedPlayers = jatos.groupSession.get(LEAVED_PLAYERS_PROPERTY);
-            // Retrieve all players in the group session
-            allPlayers = jatos.groupSession.get(ALL_MEMBER_IDS_PROPERTY);
-
             // Load configuration data from JATOS, using batch-level settings by default, falling back to empty object if none provided
             const cfg_batch = jatos.batchJsonInput || {};
             const cfg_study = jatos.studyJsonInput || {};
@@ -118,8 +143,6 @@
                     "AssociationsPerBreak": associationsPerBreak,
                     "Break duration": break_duration,
                     "Bot active": botActive,
-                    "All players": allPlayers ? allPlayers.join(", ") : "N/A",
-                    "Leaved players": leavedPlayers ? leavedPlayers.join(", ") : "None",
                     "Words list": words_list ? words_list.join(", ") : "None",
                 });
                 console.groupEnd();
@@ -131,36 +154,17 @@
                 type: jsPsychCallFunction,
                 func: () => {
                     assocIndex += 1;
-                    console.log("[UPDATE_ASSOC] assocIndex =", assocIndex, "| current_stimulus_word =", word);
                 }
             }
         }
 
-        function syncPlayers(word) {
-            const stimulus = () => {
-                let assocs = {};
-                allPlayers.forEach(pid => {
-                    const key = pid + "_" + word;
-                    assocs[key] = jatos.groupSession.get(key) || "";
-                });
-                const stimulusDiv = getHtmlTag("div", "stimuli_word", "stimuli_word", word);
-                const myValue = assocs[jatos.groupMemberId + "_" + word] || "";
-                const myInput = getHtmlTag("input", "word_input", null, null, { value: myValue, disabled: true });
-                return getScreen([stimulusDiv, myInput], false, true);
-            };
-
-            return getAllFinishParamTrial("_" + word, "", "*", true, 600, stimulus);
-        }
-
         function updateGD_trial(word){
             return updateGroupSessionTrial(
-                jatos.groupMemberId + '_' + word,
+                [[jatos.groupMemberId + '_' + word,
                 () => {
-                    const entered_word = jsPsych.data.get().last(2).values()[0]. entered_word || jsPsych.data.get().last(1).values()[0]. entered_word;
-                    console.log("entered word = ",entered_word);
-                    console.log("val = ",(entered_word === undefined || entered_word === null || entered_word === "") ? NO_RESPONSE : entered_word)
-                    return (entered_word === undefined || entered_word === null || entered_word === "") ? NO_RESPONSE : entered_word;
-                }
+                    console.log("enteredWord = ",enteredWord)
+                    return enteredWord ? enteredWord : NO_RESPONSE;}
+                ]]
             );
         }
     </script>

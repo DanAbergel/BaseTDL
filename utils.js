@@ -4,7 +4,6 @@ const RANDOM_AVATAR_EXTENSION = "_random_avatar";
 const COMPLETE_TRAINING_EXTENTION = "_complete_training";
 const COMPLETE_BREAK_EXTENTION = "_complete_break";
 const TRAINING_EXTENTION = "_training";
-const SINGLE_EXTENTION = "_single";
 FULL_SCREEN_EXTENTION = "_full_screen";
 const ALLOCATED_GROUP_PROPERTY = "allocated_group";
 const PAIRS_PROPERTY = "pairs";
@@ -21,25 +20,6 @@ const TRAINING_WORDS_PROPERTY = "training_words";
 const MAIN_WORDS_PROPERTY = "main_words";
 const PLAYERS_METADATA_PROPERTY = "players_metadata";
 const SLOW_RESPONSE_THRESHOLD_SECONDS = 4;
-
-
-async function setGroupDataRobust(key,value, maxRetries = 8) {
-    let attempt = 0;
-    while (true) {
-        try {
-            await jatos.groupSession.set(key, value);
-            console.log('[SET GROUP DATA] LEAVED updated in session:', jatos.groupSession.get(key), 'on attempt', attempt + 1);
-            return;
-        } catch (e) {
-            attempt++;
-            console.warn(`[SET GROUP DATA] set '${key}' failed (attempt ${attempt}):`, e);
-            if (attempt >= maxRetries) throw e;
-            const delay = Math.min(500, 25 * Math.pow(2, attempt - 1)) + Math.floor(Math.random() * 50);
-            await new Promise(r => setTimeout(r, delay));
-        }
-    }
-}
-
 
 
 function getWords(groupMemberId, extension = "") {
@@ -85,19 +65,23 @@ function getAvatarPath(avatar_name, img_extension = ".png", img_folder = "img/av
 }
 
 
-function getMyAvatar() {
-    return getAvatarPath(jatos.groupSession.get(jatos.groupMemberId + AVATAR_EXTENSION))
+function getAvatarById(groupMemberId = jatos.groupMemberId) {
+    console.log(jatos.groupSession.get(groupMemberId + AVATAR_EXTENSION));
+    return getAvatarPath(jatos.groupSession.get(groupMemberId + AVATAR_EXTENSION))
 }
 
 
-function getAvatarById(groupMemberId) {
+function getRandomAvatarById(groupMemberId = jatos.groupMemberId) {
     return getAvatarPath(jatos.groupSession.get(groupMemberId + RANDOM_AVATAR_EXTENSION))
 }
 
 
 function getOthersAvatars(other_players_ids) {
     const all_properties = jatos.groupSession.getAll();
-    return other_players_ids.map((groupMemberId) => getAvatarPath(all_properties[groupMemberId + RANDOM_AVATAR_EXTENSION]));
+    return other_players_ids
+        .map((groupMemberId) => all_properties[groupMemberId + RANDOM_AVATAR_EXTENSION])
+        .filter(filename => filename !== undefined && filename !== null)
+        .map(filename => getAvatarPath(filename));
 }
 
 
@@ -184,14 +168,13 @@ function getScreen(children_center, hide_other_players = false, show_loading = f
     const player_containers = [];
 
     // Main Player Container (center bottom)
-    const main_player_avatar = getHtmlTag("img", "avatar", "avatar", null, { src: getMyAvatar() });
+    const main_player_avatar = getHtmlTag("img", "avatar", "avatar", null, { src: getAvatarById(jatos.groupMemberId) });
     const main_player = getHtmlTag("div", "loading_player", "loading_player", main_player_avatar);
     const main_player_container = getHtmlTag("div", "down_container", "down_container", main_player);
     let loaders = [false, false];
 
 
     player_containers.push(main_player_container);
-
     if (!hide_other_players) {
         const other_players_ids =  others.length === 0 ? getOtherPlayersIds() : others;
         const other_avatars = getOthersAvatars(other_players_ids);
@@ -216,33 +199,34 @@ function getScreen(children_center, hide_other_players = false, show_loading = f
                 }
             }
         }
+        if(other_avatars.length > 0) {
+            if (other_players_ids.length === 1) {
+                if (other_words.length > 0) {
+                    other_players.push(getSinglePlayerContainerGeneric(other_avatars[0], "up_container", show_loading, other_words[0]));
+                } else {
+                    other_players.push(getSinglePlayerContainerGeneric(other_avatars[0], "up_container", show_loading));
+                }
+            } else if (other_players_ids.length === 2) {
+                if (other_words.length > 0) {
+                    other_players.push(getSinglePlayerContainerGeneric(other_avatars[1], "up_right_container", (show_loading && loaders[1]), other_words[1], false, "right"));
+                    other_players.push(getSinglePlayerContainerGeneric(other_avatars[0], "up_left_container", (show_loading && loaders[0]), other_words[0], false, "left"));
+                }
+                else {
+                    other_players.push(getSinglePlayerContainerGeneric(other_avatars[1], "up_right_container", (show_loading && loaders[1]), "", false, "right"));
+                    other_players.push(getSinglePlayerContainerGeneric(other_avatars[0], "up_left_container", (show_loading && loaders[0]), "", false, "left"));
+                }
 
-        if (other_players_ids.length === 1) {
-            if (other_words.length > 0) {
-                other_players.push(getSinglePlayerContainerGeneric(other_avatars[0], "up_container", show_loading, other_words[0]));
             } else {
-                other_players.push(getSinglePlayerContainerGeneric(other_avatars[0], "up_container", show_loading));
-            }
-        } else if (other_players_ids.length === 2) {
-            if (other_words.length > 0) {
-                other_players.push(getSinglePlayerContainerGeneric(other_avatars[1], "up_right_container", (show_loading && loaders[1]), other_words[1], false, "right"));
-                other_players.push(getSinglePlayerContainerGeneric(other_avatars[0], "up_left_container", (show_loading && loaders[0]), other_words[0], false, "left"));
-            }
-            else {
-                other_players.push(getSinglePlayerContainerGeneric(other_avatars[1], "up_right_container", (show_loading && loaders[1]), "", false, "right"));
-                other_players.push(getSinglePlayerContainerGeneric(other_avatars[0], "up_left_container", (show_loading && loaders[0]), "", false, "left"));
-            }
-
-        } else {
-            if (other_words.length > 0) {
-                other_players.push(getSinglePlayerContainerGeneric(other_avatars[0], "up_container", show_loading, other_words[0]));
-                other_players.push(getSinglePlayerContainerGeneric(other_avatars[1], "right_container", show_loading, other_words[1], false, "right"));
-                other_players.push(getSinglePlayerContainerGeneric(other_avatars[2], "left_container", show_loading, other_words[2], false, "left"));
-            }
-            else {
-                other_players.push(getSinglePlayerContainerGeneric(other_avatars[0], "up_container", show_loading));
-                other_players.push(getSinglePlayerContainerGeneric(other_avatars[1], "right_container", show_loading, "", false, "right"));
-                other_players.push(getSinglePlayerContainerGeneric(other_avatars[2], "left_container", show_loading, "", false, "left"));
+                if (other_words.length > 0) {
+                    other_players.push(getSinglePlayerContainerGeneric(other_avatars[0], "up_container", show_loading, other_words[0]));
+                    other_players.push(getSinglePlayerContainerGeneric(other_avatars[1], "right_container", show_loading, other_words[1], false, "right"));
+                    other_players.push(getSinglePlayerContainerGeneric(other_avatars[2], "left_container", show_loading, other_words[2], false, "left"));
+                }
+                else {
+                    other_players.push(getSinglePlayerContainerGeneric(other_avatars[0], "up_container", show_loading));
+                    other_players.push(getSinglePlayerContainerGeneric(other_avatars[1], "right_container", show_loading, "", false, "right"));
+                    other_players.push(getSinglePlayerContainerGeneric(other_avatars[2], "left_container", show_loading, "", false, "left"));
+                }
             }
         }
 
@@ -255,20 +239,14 @@ function getScreen(children_center, hide_other_players = false, show_loading = f
     return screen;
 }
 
-function allPlayersFinishTraining() {
-    return jatos.groupMembers.filter(id => !leavedPlayers.includes(id)).every((groupMemberId) => {
-        if (groupMemberId == jatos.groupMemberId) return true;
-        return jatos.groupSession.get(groupMemberId + COMPLETE_TRAINING_EXTENTION)
-    });
-}
-
 
 function allPlayersFinishParam(key, value) {
+    console.log("allPlayersFinishParam utils.py",jatos.groupSession.getAll());
     return jatos.groupMembers.every(
         (groupMemberId) => {
             if (groupMemberId === jatos.groupMemberId) return true;
             console.log("return ",jatos.groupSession.get(groupMemberId + key)," for key ",groupMemberId + key);
-            return value !== "*" ? jatos.groupSession.get(groupMemberId + key) === value : jatos.groupSession.get(groupMemberId + key) != null;
+            return (value !== "*" ? jatos.groupSession.get(groupMemberId + key) === value : jatos.groupSession.get(groupMemberId + key) != null);
         }
     );
 }
@@ -312,8 +290,37 @@ function getOtherPlayersWords() {
     return other_players_answers;
 }
 
+function getPlayersIdsByStatus(requestedStatus, others = false) {
+    const metadata = jatos.groupSession.get(PLAYERS_METADATA_PROPERTY) || {};
+
+    let ids = Object.entries(metadata)
+        .filter(([id, status]) => status === requestedStatus)
+        .map(([id]) => id)
+        .sort();
+
+    return others ? ids.filter(id => id !== jatos.groupMemberId) : ids;
+}
+
+function getPresentPlayersIds(others=false) {
+    return getPlayersIdsByStatus('present', others);
+}
+
+function getLeavedPlayersIds(others=false) {
+    return getPlayersIdsByStatus('leaved', others);
+}
+
+function getBothPlayersIds(others=false) {
+    return getPlayersIdsByStatus('bot', others);
+}
+
+function getAllPlayersIds(others=false) {
+    const metadata = jatos.groupSession.get(PLAYERS_METADATA_PROPERTY) || {};
+    const ids = Object.keys(metadata).sort();
+    return others ? ids.filter(id => id !== jatos.groupMemberId) : ids;
+}
+
 function getAllOtherPlayersIds() {
-    return allPlayers.filter(id => id !== jatos.groupMemberId).sort();
+    return getAllPlayersIds(true);
 }
 
 const AVATAR_FALLBACK = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
@@ -328,7 +335,7 @@ function getAvatarSafe(memberId){
 }
 
 function validateErrors() {
-    if (error_counter >= 30 || error_strike >= 5) {
+    if (error_strike >= 5) {
         jatos.leaveGroup().then(() => {
             jatos.endStudy(
                 jsPsych.data.get().json()
@@ -353,6 +360,13 @@ function isLeaver(id){
     return leavedPlayers.includes(id);
 }
 
+function getStatusMemberIds(status){
+    const metadata = jatos.groupSession.get(PLAYERS_METADATA_PROPERTY);
+    return Object.entries(metadata)
+        .filter(([id, status]) => status === status)
+        .map(([id]) => id);
+}
+
 /*******************************************************
  *  Get Manager ID
  * -----------------------------------------------------
@@ -363,9 +377,8 @@ function isLeaver(id){
  * @returns {string|null} First available player ID or null.
  *******************************************************/
 function getManagerID() {
-    const activePlayers = allPlayers
-        .filter(id => !leavedPlayers.includes(id))
-        .sort();
-
+    const activePlayers = getStatusMemberIds("present");
     return activePlayers.length > 0 ? activePlayers[0] : null;
 }
+
+

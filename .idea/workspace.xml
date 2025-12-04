@@ -4,7 +4,16 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="35450b17-58b0-4fa3-a0cf-f8af016e1860" name="Changes" comment="" />
+    <list default="true" id="35450b17-58b0-4fa3-a0cf-f8af016e1860" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/bot.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/main.html" beforeDir="false" afterPath="$PROJECT_DIR$/main.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/start.html" beforeDir="false" afterPath="$PROJECT_DIR$/start.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/synchronous_assoc.html" beforeDir="false" afterPath="$PROJECT_DIR$/synchronous_assoc.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/training.html" beforeDir="false" afterPath="$PROJECT_DIR$/training.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/trials.js" beforeDir="false" afterPath="$PROJECT_DIR$/trials.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/utils.js" beforeDir="false" afterPath="$PROJECT_DIR$/utils.js" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -13,8 +22,8 @@
   <component name="FileTemplateManagerImpl">
     <option name="RECENT_TEMPLATES">
       <list>
-        <option value="JavaScript File" />
         <option value="HTML File" />
+        <option value="JavaScript File" />
       </list>
     </option>
   </component>
@@ -36,7 +45,7 @@
     &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
     &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
     &quot;git-widget-placeholder&quot;: &quot;main&quot;,
-    &quot;last_opened_file_path&quot;: &quot;/Users/danabergel/Documents/External-courses/Psycho-lab/jatos_mac_java/study_assets_root/Paranoia_clone_2&quot;,
+    &quot;last_opened_file_path&quot;: &quot;/Users/danabergel/Documents/External-courses/Psycho-lab/jatos_mac_java/study_assets_root/TDL_experiments&quot;,
     &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
     &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
     &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
@@ -67,7 +76,11 @@
       <workItem from="1761896606768" duration="179000" />
       <workItem from="1761899332637" duration="606000" />
       <workItem from="1762101892515" duration="44476000" />
-      <workItem from="1762712492622" duration="54389000" />
+      <workItem from="1762712492622" duration="58802000" />
+      <workItem from="1763711670980" duration="457000" />
+      <workItem from="1763884830581" duration="635000" />
+      <workItem from="1763995342054" duration="24370000" />
+      <workItem from="1764195972995" duration="43939000" />
     </task>
     <servers />
   </component>
@@ -79,12 +92,12 @@
       <breakpoints>
         <line-breakpoint enabled="true" type="javascript">
           <url>file://$PROJECT_DIR$/main.html</url>
-          <line>451</line>
+          <line>448</line>
           <option name="timeStamp" value="1" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="javascript">
           <url>file://$PROJECT_DIR$/synchronous_assoc.html</url>
-          <line>91</line>
+          <line>121</line>
           <option name="timeStamp" value="2" />
         </line-breakpoint>
       </breakpoints>

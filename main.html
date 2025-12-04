@@ -36,12 +36,9 @@
         let firstTurn = 0;
         let allAvatars = []
         let seedN = 4;
-        let leavedPlayers = []
-        let allPlayers = [];
         let botAnswer = false;
         let avatarsCache = {};
         let isTurnBased = false;
-        let break_duration = 0;
     </script>
 
 
@@ -581,9 +578,7 @@ function getGDLength() {
          */
         function initializeSessionVariables() {
             // Retrieve players who have left the group session
-            leavedPlayers = jatos.groupSession.get(LEAVED_PLAYERS_PROPERTY);
             // Retrieve all players in the group session
-            allPlayers = jatos.groupSession.get(ALL_MEMBER_IDS_PROPERTY);
             // Retrieve the experiment mode (e.g., normal, debug, etc.)
             mode = jatos.groupSession.get(MODE_PROPERTY);
 

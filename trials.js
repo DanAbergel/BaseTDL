@@ -2,39 +2,49 @@
 const makeConditionalTrial = (conditionFn, timeline) => ({ conditional_function: conditionFn, timeline });
 
 // Function to get the update trial
-function updateGroupSessionTrial(key, valueOrFn, maxAttempts = 2) {
+function updateGroupSessionTrial(keys_values, maxRetries = 8) {
     return {
         type: jsPsychCallFunction,
         async: true,
         func: async function (done) {
-            // Resolve the value at runtime (after previous trials have finished)
-            const value = (typeof valueOrFn === 'function') ? valueOrFn() : valueOrFn;
+            // Block execution for 10 seconds
             let attempt = 0;
             let success = false;
-            while (attempt < maxAttempts && !success) {
+            console.log("updateGroupSessionTrial!!!!!!!!!!!!!!!!!!!!!!!");
+            console.log("attempts: " + attempt , "maxRetries: ",maxRetries, "success: ",success);
+            while (attempt < maxRetries && !success) {
+                console.log("attempt", attempt);
                 try {
-                    await jatos.groupSession.set(key, value);
-                    console.log("Updated " + key + " to " + value);
+                    const gd = jatos.groupSession.getAll();
+                    for (let i = 0; i < keys_values.length; i++) {
+                        const [key, valueOrFn] = keys_values[i];
+                        gd[key] = (typeof valueOrFn === 'function')
+                            ? valueOrFn()
+                            : valueOrFn;
+                        console.log(`[SET GROUP DATA TRIAL] ${key} was set to ${gd[key]} written after ${attempt + 1} attempt(s)`);
+                    }
+                    await jatos.groupSession.setAll(gd);
                     success = true;
                     done();
                     break;
                 } catch (e) {
                     attempt++;
-                    console.error("Error updating " + key + " to " + value + ": " + e + "; Trying again (attempt " + attempt + " of " + maxAttempts + ")");
-                    if (attempt < maxAttempts) {
-                        // Wait random delay before retry
-                        await new Promise(resolve => setTimeout(resolve, Math.random() * 1000));
+                    console.error(`[SET GROUP DATA TRIAL] Error on attempt ${attempt}:`, e);
+                    if (attempt >= maxRetries) {
+                        console.error(`[SET GROUP DATA TRIAL] FAILED after ${attempt} attempts`);
+                        done();
+                        return;
                     }
+                    const delay =
+                        Math.min(500, 25 * Math.pow(2, attempt - 1))
+                        + Math.floor(Math.random() * 50);
+                    await new Promise(r => setTimeout(r, delay));
                 }
             }
-            if (!success) {
-                console.log("Error updating " + key + " to " + value + " after " + maxAttempts + " attempts");
-                done();
-            }
+            if (!success) done();
         }
-    }
+    };
 }
-window.updateGroupSessionTrial = updateGroupSessionTrial;
 
 
 // Function to get the wait trial
@@ -79,12 +89,12 @@ function getAllFinishParamTrial(wait_param, wait_msg, values = "*", hide_other_p
             if (typeof stimulusFn === "function") {
                 return stimulusFn();
             }
-            const wait_html = getHtmlTag("div", "wait", "wait", wait_msg, hide_other_player_avatar);
-            return getScreen([wait_html], true);
-        },
+            else{
+                const wait_html = getHtmlTag("div", "wait", "wait", wait_msg, hide_other_player_avatar);
+                return getScreen([wait_html], true);
+            }},
         choices: "NO_KEYS",
         on_load: function () {
-            console.log("Waiting for " + wait_param);
             let counter = 0; // Initialize counter for skipping if the other participant is non-responsive
             let interval = setInterval(function () {
                 if (counterLimit > 0) counter++;
@@ -92,7 +102,7 @@ function getAllFinishParamTrial(wait_param, wait_msg, values = "*", hide_other_p
                 const vals = Array.isArray(values) ? values : [values];
                 // Check if at least one condition is satisfied
                 const allFinished = vals.some(val => allPlayersFinishParam(wait_param, val));
-                console.log("allFinished = ",allFinished , " counterLimit = ",counterLimit , " counter = ",counter);
+                // console.log("allFinished = ",allFinished);
                 if (allFinished || (counterLimit && counter >= counterLimit)) {
                     clearInterval(interval);
                     setTimeout(jsPsych.finishTrial, 100);
@@ -110,7 +120,7 @@ function getSendResults() {
         func: function (done) { // Define the function
             jatos.submitResultData("START_TEMP" + jsPsych.data.get().json() + "END_TEMP")
                 .then(() => {
-                    console.log('Updated results data')
+                    // console.log('Updated results data')
                     //jatos.appendResultData(jsPsych.data.getInteractionData())
                     //    .then(() => console.log("Appended interaction data"))
                     //    .catch(() => console.log("Error appending interaction data"))
@@ -150,17 +160,9 @@ function fullscreenTrial() {
 
 // Helper to build the countdown screen HTML (word + timer + optional players)
 function createStimulusHTML(word,countdown = true) {
-    console.log("stimulus word = ",word);
     const stimulus_word_html = getHtmlTag("div", "stimuli_word received-word", "stimuli_word", word);
-    const timer_html = getHtmlTag("div", "timer", "timer", "0:15");
-
-    return getScreen(
-        countdown ? [timer_html, stimulus_word_html] : [stimulus_word_html],
-        false, // hide_other_players
-        false, // show_loading
-        [],    // other_words
-        getAllOtherPlayersIds()
-    );
+    const timer_html = countdown ? getHtmlTag("div", "timer", "timer", "0:15") : undefined;
+    return [stimulus_word_html, timer_html];
 }
 
 // Helper to run and update the countdown timer in the DOM
@@ -207,28 +209,33 @@ function getCountdownTrial(word ,time= 15) {
         type: jsPsychHtmlKeyboardResponse,
         choices: [' '], // Spacebar
         trial_duration: time * 1000,
-        stimulus: () => { return createStimulusHTML(word,true); },
+        stimulus: () => {
+            const [stimulus_word_html,timer_html] = createStimulusHTML(word,true);
+            return getScreen(
+                [timer_html, stimulus_word_html],
+                false, // hide_other_players
+                false, // show_loading
+                [],    // other_words
+                getAllOtherPlayersIds()
+            );
+            },
         on_start: function () {
-            console.log("word = ",word);
             // Start the visual timer and keep the interval ID in a local var
             this.__timerId = startTimer(time * 1000);
             // Add an event listener for the spacebar key press
         },
         on_finish: function (data) {
             // Clean up interval if still running
-            console.log("finish");
             if (this.__timerId) {
                 clearInterval(this.__timerId);
                 this.__timerId = null;
             }
-
-            // saveCountdownData(data);
         }
     };
 }
 
 
-function getTextInputTrial() {
+function getTextInputTrial(word,countdown = false) {
     let startTimer;
     let keysPressed = [];
     let keystroke_rt = [];
@@ -246,8 +253,9 @@ function getTextInputTrial() {
         choices: ['enter'],
         trial_duration: textInput_limit * 1000,
         stimulus: () => {
+            const [stimuli_html, timer_html] = createStimulusHTML(word,countdown);
             const input_html = getHtmlTag("input", "word_input sent-word", "word_input", null, { type: "text", autocomplete: "off" });
-            return getScreen([input_html], false, false, [], getAllOtherPlayersIds());
+            return getScreen([stimuli_html,input_html], false, false, [], getAllOtherPlayersIds());
         },
         on_load: () => {
             startTimer = performance.now();
@@ -321,10 +329,9 @@ function getSlowErrorTrial(){
         },
         choices: "NO_KEYS",
         trial_duration: 3 * 1000,
-        // on_finish: function (data) {
-        //     // let data1 = jsPsych.data.get().last(2).values()[0];
-        //     // data.slow = data1.slow;
-        // }
+        on_finish: function (data) {
+            // console.log("slow_error!!!!!!!!!!!!!!!", data);
+        }
     };
 }
 
@@ -393,10 +400,9 @@ function getWordExchangeTrial(word) {
      * Returns the conditional trial objects for the word exchange phase.
      * Uses concise helpers for clarity and avoids duplicated logic.
      */
-    const text_input_trial = getTextInputTrial();
+    const text_input_trial = getTextInputTrial(word);
     const slow_error_condition = makeConditionalTrial(()=>{
         let data = jsPsych.data.get().last(1).values()[0];
-        console.log("data = ",data);
         return data.slow;
     },[getSlowErrorTrial()]);
 
@@ -409,43 +415,6 @@ function getWordExchangeTrial(word) {
             }, [text_input_trial,slow_error_condition]
     );
 }
-
-
-/**
- * Gathers all trials that occur after the participant writes a new word.
- * Handles receiver selection, missing-response errors, and updates turn state.
- */
-function getPostWordTrialsUnsyncGame() {
-    const choose_receiver_trial = getChooseReceiverTrial();
-    const receiver_error_condition = makeConditionalTrial(() => {
-        const data = jsPsych.data.get().last(1).values()[0];
-        return !data.chose_reciever;
-    }, [getReceiverErrorTrial()]);
-    const error_trial = getErrorTrial();
-    const update_trial = getUpdateWordTrial();
-
-    return [
-        // If participant was slow: show receiver selection and possible error
-        makeConditionalTrial(
-            () => {
-                const data = jsPsych.data.get().last(1).values()[0];
-                return data.rt !== null && data.slow;
-            },
-            [choose_receiver_trial, receiver_error_condition]
-        ),
-        // If no response or did not choose receiver: show error trial
-        makeConditionalTrial(
-            () => {
-                const data = jsPsych.data.get().last(1).values()[0];
-                return data.response === null || data.chose_reciever === false;
-            },
-            [error_trial]
-        ),
-        // Final update trial to record the entered word and advance the turn
-        update_trial
-    ];
-}
-
 
 /**
  * Trial displaying the player's answer and those of the other participants.
@@ -467,32 +436,23 @@ function getDisplayAnswersTrial(word) {
          */
         stimulus: () => {
             // Retrieve the list of the current player's words
-            // console.log("🔍 Building assocs for word:", word);
             let assocs = {};
-            allPlayers.forEach(pid => {
+            getAllPlayersIds().forEach(pid => {
                 const key = pid + "_" + word;
                 assocs[key] = jatos.groupSession.get(key) || "";
-                // console.log("   >>", key, "=", assocs[key]);
             });
-            // console.log("✅ Final assocs:", assocs);
 
             // Create the area displaying the stimulus
             const stimulusDiv = getHtmlTag("div", "stimuli_word", "stimuli_word", word);
-
-            // Log current player key and value
-            // console.log("👤 Current player key:", jatos.groupMemberId + "_" + word);
-            // console.log("👤 Current player value:", assocs[jatos.groupMemberId + "_" + word]);
 
             // Create a non-interactive text field containing the player's last response
             const myInput = getHtmlTag("input", "word_input", null, null, { value: assocs[jatos.groupMemberId + "_" + word] });
 
             // Log before mapping other players' words
-            // console.log("🧑‍🤝‍🧑 Computing other players' words");
             // Retrieve and display the words of the other players
             const otherPlayersWords = Object.entries(assocs)
                 .filter(([key]) => key !== jatos.groupMemberId + "_" + word)
                 .map(([, value]) => value);
-            // console.log("📦 otherPlayersWords:", otherPlayersWords);
 
             // Assemble the complete screen (stimulus + your word + other players' words)
             return getScreen([stimulusDiv, myInput], false, false, otherPlayersWords);
@@ -512,15 +472,6 @@ function getDisplayAnswersTrial(word) {
 }
 
 
-
-
-
-
-
-
-
-
-
 ///////////////////////////////////////////////////////////////////////////////////////
 /**
  * Manages the process of ensuring all participants enter fullscreen mode before proceeding.
@@ -534,9 +485,9 @@ function getDisplayAnswersTrial(word) {
  */
 function manageFullScreenTrial() {
     let timeline = [];
-    timeline.push(updateGroupSessionTrial(jatos.groupMemberId + FULL_SCREEN_EXTENTION, false));
+    timeline.push(updateGroupSessionTrial([[jatos.groupMemberId + FULL_SCREEN_EXTENTION,false]]));
     timeline.push(fullScreen_condition());
-    timeline.push(updateGroupSessionTrial(jatos.groupMemberId + FULL_SCREEN_EXTENTION, true));
+    timeline.push(updateGroupSessionTrial([[jatos.groupMemberId + FULL_SCREEN_EXTENTION,true]]));
     timeline.push(getWaitAllPlayersTrial(FULL_SCREEN_EXTENTION, "Wait until other participant switches to full screen", false, 60 * 10));
     return timeline;
 }
@@ -582,7 +533,7 @@ function getWaitAllPlayersTrial(wait_param, wait_msg, hide_other_player_avatar =
  * Detects when a break is needed, shows the break screen and questions,
  * and advances or resets block state to keep all players synchronized.
  */
-function break_condition() {
+function break_condition(sync=true) {
     /*******************************************************
      * 💤 BREAK TRIAL
      * -----------------------------------------------------
@@ -596,19 +547,26 @@ function break_condition() {
         choices: "NO_KEYS",
         trial_duration: break_duration,
     });
+    timeline = [
+        updateGroupSessionTrial(jatos.groupMemberId+COMPLETE_BREAK_EXTENTION,"entered"),
+        breakTrial(),
+        ...getQuestionsTrial(),
+        getSendResults(),
+        updateGroupSessionTrial(jatos.groupMemberId+COMPLETE_BREAK_EXTENTION,"finished"),
+
+    ]
+    if(sync){
+        timeline.push(getAllFinishParamTrial(
+            COMPLETE_BREAK_EXTENTION,
+            "Waiting for the other player to finish the break section.",
+            "finished",
+            true,
+            0
+        ))
+    }
+
     return {
-        timeline: [
-            updateGroupSessionTrial(jatos.groupMemberId+COMPLETE_BREAK_EXTENTION,"entered"),
-            breakTrial(),
-            ...getQuestionsTrial(),
-            updateGroupSessionTrial(jatos.groupMemberId+COMPLETE_BREAK_EXTENTION,"finished"),
-            getAllFinishParamTrial(
-                COMPLETE_BREAK_EXTENTION,
-                "Waiting for the other player to finish the break section.",
-                "finished",
-                true,
-                0
-            )                ],
+        timeline: timeline,
         conditional_function: () => {
             const shouldBreak = checkBreak();
             breakStates.push(shouldBreak);
@@ -616,8 +574,6 @@ function break_condition() {
         },
     }
 }
-
-
 
 // Helper to create a single Likert trial
 function createLikertTrial(promptHtml, name) {
@@ -632,5 +588,17 @@ function createLikertTrial(promptHtml, name) {
                 name: name
             }
         ],
+    };
+}
+
+function getFixationCrossTrial(time_seconds=1) {
+    return {
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: function () {
+            fixation_html = getHtmlTag("div", "fixation", "fixation", "+");
+            return getScreen([fixation_html], true);
+        },
+        choices: "NO_KEYS",
+        trial_duration: time_seconds*1000,
     };
 }

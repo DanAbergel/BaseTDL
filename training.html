@@ -11,6 +11,8 @@
     <script src="https://unpkg.com/@jspsych/plugin-fullscreen@1.2.1"></script>
     <script src="https://unpkg.com/@jspsych/plugin-instructions@1.1.3"></script>
     <link href="https://unpkg.com/jspsych@7.3.4/css/jspsych.css" rel="stylesheet" type="text/css">
+    <script src="https://unpkg.com/@jspsych/plugin-survey-likert@1.1.3"></script>
+
 
     <script src="libs/jquery-3.5.1.min.js"></script>
     <script src="jatos.js"></script>
@@ -20,112 +22,34 @@
     <link rel="stylesheet" type="text/css" href="css/styles.css" />
 
     <script id="Variables">
-        let current_words = [];
         let showLog = false;
-        let leavedPlayers = [];
-    </script>
-
-
-    <script id="SET - Group Session">
-        async function addWord(group_member_id, word, phase) {
-            if (showLog) console.log("enteredWord " + word)
-            let extension = phase === "training" ? TRAINING_EXTENTION : SINGLE_EXTENTION
-            let words = getWords(group_member_id, extension);
-            // Modify the words array
-            words.push(word);
-
-            let properties = jatos.groupSession.getAll();
-            properties[group_member_id + SINGLE_EXTENTION] = words;
-
-            if (phase === "single") {
-                // Add the word pair to the pairs array
-                let pairs = jatos.groupSession.get(PAIRS_PROPERTY + SINGLE_EXTENTION) || [];
-                current_words.forEach((single_word) => {
-                    pairs.push([single_word, word]);
-                });
-                properties[PAIRS_PROPERTY + SINGLE_EXTENTION] = pairs;
-            }
-            current_words = [];
-
-            await jatos.groupSession.setAll(properties)
-        }
-
+        let associationsPerBreak = 0;
+        let botActive = false;
+        let error_strike = 0;
+        let words_list = [];
+        let textInput_limit = 0;
+        let textStart_limit = 0;
+        let breakStates = []
+        let assocIndex = 0;
+        let enteredWord = ""; // Initialize the entered word
+        let break_duration = 0;
     </script>
 
     <script id="Trials">
-        function getFixationCrossTrial() {
-            return {
-                type: jsPsychHtmlKeyboardResponse,
-                stimulus: function () {
-                    fixation_html = getHtmlTag("div", "fixation", "fixation", "+");
-                    return getScreen([fixation_html], true);
-                },
-                choices: "NO_KEYS",
-                trial_duration: 1000,
-            };
-        }
-
-
-        function getQuestions() {
-            let ques_trials = [];
-            ques_trials.push({
-                type: jsPsychSurveyLikert,
-                questions: [
-                    {
-                        prompt: "To what extent do you identify with the following statement:<br><b>I enjoyed the game so far</b>",
-                        labels: ["Not at all", "A little bit", "Moderately", "To some extent", "A lot"], // Rating scale
-                        required: true, // Make the rating required
-                        scale_width: 10,
-                        name: "sync"
-                    }
-                ],
-            });
-
-            return ques_trials;
-        }
-
-
-        function endExperimentTrial() {
-            return {
-                type: jsPsychCallFunction, // Call a function
-                func: function () { // Define the function
-                    jsPsych.endExperiment()
-                }
-            }
-        }
-
-
-        function getAllFinishTrainingTrial(wait_msg, hide_other_player_avatar = true, counterLimit = 0) {
-            return {
-                type: jsPsychHtmlKeyboardResponse,
-                stimulus: function () {
-                    const wait_html = getHtmlTag("div", "wait", "wait", wait_msg, hide_other_player_avatar);
-                    return getScreen([wait_html], true);
-                },
-                choices: "NO_KEYS",
-                on_load: function () {
-                    let counter = 0; //Initialize counter for skipping to ratings if the other participant is non-responsive
-                    interval = setInterval(function () {
-                        if (counterLimit > 0) counter++;
-                        if (allPlayersFinishTraining() || (counterLimit > 0 && counter >= counterLimit)) {
-                            clearInterval(interval);
-                            setTimeout(function () {
-                                jsPsych.finishTrial();
-                            }, 100);
-                        }
-                    }, 10);
-                }
-            };
+        function getQuestionsTrial() {
+            return [createLikertTrial("To what extent do you identify with the following statement:<br><b>I enjoyed the game so far</b>","trainingQuestions")];
         }
 
 
         function displaysTrainingInstructionsTrial(text) {
-            text = 'You finished the training!',
-                'Get ready to start the game!<br>Remember - in this part of the game you will be playing by yourself.<br>The other player will <b>NOT</b> see the associations you write in this part',
-                'Click NEXT to start the game';
+            text = [
+                'Welcome to the training session!',
+                'In this part, you will learn how the game works and practice the tasks step by step.<br>Take your time to understand the instructions — this phase is designed to help you feel fully comfortable before the real game begins.',
+                'When you feel ready, click NEXT to begin the training.'
+            ];
             return {
                 type: jsPsychInstructions,
-                pages:text ,
+                pages: text,
                 show_clickable_nav: true,
                 allow_keys: false
             }
@@ -158,37 +82,12 @@
         }
 
 
-        // Robust setter for LEAVED_PLAYERS_PROPERTY with retry & jitter
-        async function setLeaversRobust(value, maxRetries = 8) {
-            let attempt = 0;
-            while (true) {
-                try {
-                    await jatos.groupSession.set(LEAVED_PLAYERS_PROPERTY, value);
-                    console.log('[TRAINING] LEAVED updated in session:', jatos.groupSession.get(LEAVED_PLAYERS_PROPERTY));
-                    return;
-                } catch (e) {
-                    attempt++;
-                    console.warn('[TRAINING] set LEAVED failed (attempt ' + attempt + '):', e);
-                    if (attempt >= maxRetries) throw e;
-                    const delay = Math.min(500, 25 * Math.pow(2, attempt - 1)) + Math.floor(Math.random() * 50);
-                    await new Promise(r => setTimeout(r, delay));
-                }
-            }
-        }
-
-
         async function onMemberLeave(memberId) {
-            if (!leavedPlayers.includes(memberId)) {
-                leavedPlayers.push(memberId);
-                if (showLog) console.log('Player id ' + memberId + ' has been added to leavedPlayers');
-            }
-            console.log("actual players are "+ jatos.groupMembers.filter((groupMemberId) => groupMemberId !== memberId))
-            onOtherPlayerDrop();
-            // Persist leavers for the main module (write only if mutated)
-            try {
-                await setLeaversRobust(leavedPlayers);
-            } catch (e) {
-                console.error('[TRAINING] Failed to set LEAVED_PLAYERS_PROPERTY after retries:', e);
+            console.log("Players status : ",jatos.groupSession.get(PLAYERS_METADATA_PROPERTY));
+            if (getManagerID() === jatos.groupMemberId) {
+                jatos.groupSession.set(PLAYERS_METADATA_PROPERTY + "." + id, botActive ? "bot" : "leaved")
+                    .then(() => console.log("Updated metadata after member leave:", botActive ? "bot" : "leaved"))
+                    .catch(e => console.log("Error updating metadata", e));
             }
         }
 
@@ -199,54 +98,49 @@
         // ===== Helper: read common inputs and session =====
         function initializeSessionVariables() {
             showLog = jatos.batchJsonInput.showLog || jatos.studyJsonInput.showLog || false;
+            words_list = jatos.groupSession.get(TRAINING_WORDS_PROPERTY);
+            break_duration = jatos.batchJsonInput.break_duration || jatos.studyJsonInput.break_duration || 15 * 1000
+            textInput_limit = jatos.batchJsonInput.textInput_limit || jatos.studyJsonInput.textInput_limit || 10
+            textStart_limit = jatos.batchJsonInput.textStart_limit || jatos.studyJsonInput.textStart_limit || 1.5
+            associationsPerBreak = jatos.batchJsonInput.associationsPerBreak || jatos.studyJsonInput.associationsPerBreak || 10;
         }
 
 
-        // ===== Helper: add a standard word block (fixation → countdown → text input) =====
-        function addWordTrialBlock(timeline, word, phase) {
-            timeline.push(fullScreen_condition());
-            timeline.push(getFixationCrossTrial());
-            timeline.push(getCountdownTrial());
-            timeline.push(...getWordExchangeTrial());
+
+        /*******************************************************
+         * CHECK BREAK CONDITION BETWEEN ASSOCIATIONS
+         * -----------------------------------------------------
+         * We trigger a break when:
+         *  - The number of associations so far (`assocIndex`)
+         *    is a multiple of `associationsPerBreak`
+         *  - The last sender is still active (not a leaver)
+         *******************************************************/
+        function checkBreak() {
+            console.log("assoc index = ",assocIndex , " associationsPerBreak = ",associationsPerBreak);
+            return assocIndex % associationsPerBreak === 0;
         }
 
-        // ===== Helper: should we insert a block break? =====
-        function shouldInsertBreak(i, blockTrials) {
-            return (blockTrials > 0) && (i !== 0) && (i % blockTrials === 0);
+        function updateAssociationState() {
+            return {
+                type: jsPsychCallFunction,
+                func: () => {
+                    assocIndex += 1;
+                    console.log("updateAssociationState");
+                }
+            }
         }
 
 
         function onOpen() {
             initializeSessionVariables();
 
-
-            // const gs = { ...groupSession };
-            // gs[ALL_MEMBER_IDS_PROPERTY] = jatos.groupMembers;
-            // gs[LEAVED_PLAYERS_PROPERTY] = leavedPlayers;
-            // jatos.groupSession.setAll(gs);
-
             let timeline = [];
-
             timeline.push(displaysTrainingInstructionsTrial());
+            timeline.push(updateGroupSessionTrial([
+                [jatos.groupMemberId + COMPLETE_TRAINING_EXTENTION, true]
+            ]));
+            timeline.push(getAllFinishParamTrial(COMPLETE_TRAINING_EXTENTION,"Please wait for the other players to finish the training part of the game"));
 
-            // 4c. Single words phase (with periodic breaks/questions)
-            for (let i = 0; i < singleWords.length; i++) {
-                if (shouldInsertBreak(i, blockTrials)) {
-                    timeline.push(getSendResults());
-                    timeline.push(...getQuestions());
-                    timeline.push(breakTrial());
-                }
-                addWordTrialBlock(timeline, singleWords[i], "single");
-            }
-
-            // 4d. End-of-training sync and wait for others
-            timeline.push(updateGroupSessionTrial(jatos.groupMemberId + COMPLETE_TRAINING_EXTENTION, true));
-            if (showLog) console.log("trying to check if others have finished...");
-            timeline.push(getAllFinishTrainingTrial("Please wait for the other players to finish the training part of the game"));
-
-            if (showLog) console.log(`Timeline ready with ${timeline.length} trials`);
-
-            // STEP 5: Run jsPsych
             jsPsych.run(timeline);
 
             // STEP 6: Add Prolific metadata

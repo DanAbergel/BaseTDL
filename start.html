@@ -14,6 +14,7 @@
     <script src="libs/jquery-3.5.1.min.js"></script>
     <script src="jatos.js"></script>
     <script src="utils.js"></script>
+    <script src="trials.js"></script>
     <link rel="stylesheet" href="libs/pure-release-0.6.0/pure-min.css">
     <link rel="stylesheet" type="text/css" href="css/styles.css" />
 
@@ -41,13 +42,16 @@
         let my_random_avatar;
         let botActive;
         let showLog;
+
     </script>
 
     <script id="Functions">
         // Function to handle the avatar click event
         function onAvatarClick(avatar_name, avatars_options) {
+            console.log("CLICK TRIGGERED AGAIN WTF", avatar_name);
             my_avatar_element = document.getElementById(avatar_name);
             my_avatar_element.style.border = "5px solid #4CAF50"; // Green border
+            console.log("avatar name = ", avatar_name);
             my_avatar = avatar_name;
             jatos.studySessionData["studyAvatar"] = my_avatar;
             // filtering out the selected avatar
@@ -58,27 +62,6 @@
     </script>
 
     <script id="Trials">
-        // Function to shuffle with a fixed seed
-        function shuffle_seed(array, seed) {
-            let currentIndex = array.length, temporaryValue, randomIndex;
-            seed = seed || 1;
-            let random = function () {
-                var x = Math.sin(seed++) * 10000;
-                return x - Math.floor(x);
-            };
-            // While there remain elements to shuffle...
-            while (0 !== currentIndex) {
-                // Pick a remaining element...
-                randomIndex = Math.floor(random() * currentIndex);
-                currentIndex -= 1;
-                // And swap it with the current element.
-                temporaryValue = array[currentIndex];
-                array[currentIndex] = array[randomIndex];
-                array[randomIndex] = temporaryValue;
-            }
-            return array;
-        }
-
         // Function to select the avatar
         function selectAvatarTrial() {
             const avatars_options = jatos.groupMemberId === jatos.groupMembers[0] ? AVATARS_LIST.slice(0, 4) : jatos.groupMemberId == jatos.groupMembers[1] ? AVATARS_LIST.slice(5, 9) : AVATARS_LIST.slice(10, 14);
@@ -95,47 +78,11 @@
                     avatars_options.forEach(avatar_name => {
                         document.getElementById(avatar_name).addEventListener("click", () => onAvatarClick(avatar_name, avatars_options));
                     });
+                    console.log("Finished to click");
                 },
                 choices: "NO_KEYS"
             };
         }
-
-        function updateAvatarTrial() {
-            return {
-                type: jsPsychCallFunction,
-                async: true,
-                func: async function () {
-                    await jatos.groupSession.set(jatos.groupMemberId + AVATAR_EXTENSION, my_avatar)
-                        .then(() => { console.log("Avatar updated successfully"); jsPsych.finishTrial(); })
-                        .catch((e) => {
-                            setTimeout(() => {
-                                jatos.groupSession.set(jatos.groupMemberId + AVATAR_EXTENSION, my_avatar)
-                                    .then(() => { console.log("Avatar updated successfully (2nd attempt)"); jsPsych.finishTrial(); })
-                                    .catch((e) => { console.log("Error updating avatar", e); jsPsych.finishTrial(); })
-                            }, Math.random() * 1000);
-                        })
-                }
-            }
-        }
-
-        function updateRandomAvatarTrial() {
-            return {
-                type: jsPsychCallFunction,
-                async: true,
-                func: async function () {
-                    await jatos.groupSession.set(jatos.groupMemberId + RANDOM_AVATAR_EXTENSION, my_random_avatar)// my_random_avatar)
-                        .then(() => { console.log("Random avatar updated successfully"); jsPsych.finishTrial(); })
-                        .catch((e) => {
-                            setTimeout(() => {
-                                jatos.groupSession.set(jatos.groupMemberId + RANDOM_AVATAR_EXTENSION, my_random_avatar)
-                                    .then(() => { console.log("Avatar updated successfully (2nd attempt)"); jsPsych.finishTrial(); })
-                                    .catch((e) => { console.log("Error updating avatar", e); jsPsych.finishTrial(); })
-                            }, Math.random() * 1000);
-                        })
-                }
-            }
-        }
-
     </script>
 
     <script id="Experiment">
@@ -146,26 +93,17 @@
         });
 
 
-
         // Function to initialize all global variables shared across modules
         function initializeGlobalVariables() {
             console.log("Initializing global experiment variables...");
             botActive = jatos.batchJsonInput.botActive || jatos.studyJsonInput.botActive || false;
             showLog = jatos.batchJsonInput.showLog || jatos.studyJsonInput.showLog || false;
-            console.log("Global variables initialized");
-        }
-
-        function onOpen() {
-            // Initialize global variables before anything else
-            initializeGlobalVariables();
-            // Retrieve current group session properties before modification
-            if (jatos.groupMemberId === getManagerID()) {  //Make sure group allocation is initialized only once
+            if (jatos.groupSession.get(PLAYERS_METADATA_PROPERTY) === undefined) {
+                //Make sure group allocation is initialized only once
                 properties = jatos.groupSession.getAll();
                 properties[ALLOCATED_GROUP_PROPERTY] = Math.floor(Math.random() * 3) + 1;
                 const words_list = jatos.batchJsonInput.words_list || jatos.studyJsonInput.words_list || [];
-                const num_splits = jatos.batchJsonInput.num_splits || jatos.studyJsonInput.num_splits || 2;
-
-                // Compute size of each fraction
+                const num_splits = jatos.batchJsonInput.num_splits || jatos.studyJsonInput.num_splits || 20;
                 const fraction_size = Math.ceil(words_list.length / num_splits);
 
                 properties[TRAINING_WORDS_PROPERTY] = words_list.slice(0, fraction_size);
@@ -175,13 +113,31 @@
                     jatos.groupMembers.map(id => [id, "present"])
                 );
                 jatos.groupSession.setAll(properties)
-                    .then(() => { console.log("Group allocation initialized" + jatos.groupSession.get(ALLOCATED_GROUP_PROPERTY))})
+                    .then(() => { console.log("Group allocation initialized. Allocated group: " + jatos.groupSession.get(ALLOCATED_GROUP_PROPERTY))})
             }
+            console.log("Global variables initialized");
+        }
+
+        function onOpen() {
+            // Initialize global variables before anything else
+            initializeGlobalVariables();
 
             timeline = [];
             timeline.push(selectAvatarTrial())
-            timeline.push(updateAvatarTrial())
-            timeline.push(updateRandomAvatarTrial())
+            timeline.push({
+                type: jsPsychCallFunction,
+                async func() {
+                    console.log("my avatar = ", my_avatar);
+                    console.log([
+                        [jatos.groupMemberId + AVATAR_EXTENSION, my_avatar],
+                        [jatos.groupMemberId + RANDOM_AVATAR_EXTENSION, my_random_avatar]
+                    ]);
+                }
+            });
+            timeline.push(updateGroupSessionTrial([
+                [jatos.groupMemberId + AVATAR_EXTENSION, ()=>{return my_avatar}],
+                [jatos.groupMemberId + RANDOM_AVATAR_EXTENSION, ()=>{return my_random_avatar}],
+            ]));
             jsPsych.run(timeline);
 
             jsPsych.data.addProperties({
@@ -192,11 +148,10 @@
         }
 
         function onMemberLeave(id) {
+            console.log("Players status : ",jatos.groupSession.get(PLAYERS_METADATA_PROPERTY));
             if (getManagerID() === jatos.groupMemberId) {
-                let props = jatos.groupSession.getAll();
-                props[PLAYERS_METADATA_PROPERTY][id] = botActive ? "bot" : "leaved";
-                jatos.groupSession.setAll(props)
-                    .then(() => console.log("Updated metadata after member leave:",props[PLAYERS_METADATA_PROPERTY][id] ))
+                jatos.groupSession.set(PLAYERS_METADATA_PROPERTY + "." + id, botActive ? "bot" : "leaved")
+                    .then(() => console.log("Updated metadata after member leave:", botActive ? "bot" : "leaved"))
                     .catch(e => console.log("Error updating metadata", e));
             }
         }
