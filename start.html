@@ -48,10 +48,8 @@
     <script id="Functions">
         // Function to handle the avatar click event
         function onAvatarClick(avatar_name, avatars_options) {
-            console.log("CLICK TRIGGERED AGAIN WTF", avatar_name);
             my_avatar_element = document.getElementById(avatar_name);
             my_avatar_element.style.border = "5px solid #4CAF50"; // Green border
-            console.log("avatar name = ", avatar_name);
             my_avatar = avatar_name;
             jatos.studySessionData["studyAvatar"] = my_avatar;
             // filtering out the selected avatar
@@ -78,7 +76,6 @@
                     avatars_options.forEach(avatar_name => {
                         document.getElementById(avatar_name).addEventListener("click", () => onAvatarClick(avatar_name, avatars_options));
                     });
-                    console.log("Finished to click");
                 },
                 choices: "NO_KEYS"
             };
@@ -124,16 +121,6 @@
 
             timeline = [];
             timeline.push(selectAvatarTrial())
-            timeline.push({
-                type: jsPsychCallFunction,
-                async func() {
-                    console.log("my avatar = ", my_avatar);
-                    console.log([
-                        [jatos.groupMemberId + AVATAR_EXTENSION, my_avatar],
-                        [jatos.groupMemberId + RANDOM_AVATAR_EXTENSION, my_random_avatar]
-                    ]);
-                }
-            });
             timeline.push(updateGroupSessionTrial([
                 [jatos.groupMemberId + AVATAR_EXTENSION, ()=>{return my_avatar}],
                 [jatos.groupMemberId + RANDOM_AVATAR_EXTENSION, ()=>{return my_random_avatar}],
@@ -148,7 +135,7 @@
         }
 
         function onMemberLeave(id) {
-            console.log("Players status : ",jatos.groupSession.get(PLAYERS_METADATA_PROPERTY));
+            // console.log("Players status : ",jatos.groupSession.get(PLAYERS_METADATA_PROPERTY));
             if (getManagerID() === jatos.groupMemberId) {
                 jatos.groupSession.set(PLAYERS_METADATA_PROPERTY + "." + id, botActive ? "bot" : "leaved")
                     .then(() => console.log("Updated metadata after member leave:", botActive ? "bot" : "leaved"))

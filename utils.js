@@ -66,7 +66,6 @@ function getAvatarPath(avatar_name, img_extension = ".png", img_folder = "img/av
 
 
 function getAvatarById(groupMemberId = jatos.groupMemberId) {
-    console.log(jatos.groupSession.get(groupMemberId + AVATAR_EXTENSION));
     return getAvatarPath(jatos.groupSession.get(groupMemberId + AVATAR_EXTENSION))
 }
 
@@ -241,11 +240,9 @@ function getScreen(children_center, hide_other_players = false, show_loading = f
 
 
 function allPlayersFinishParam(key, value) {
-    console.log("allPlayersFinishParam utils.py",jatos.groupSession.getAll());
     return jatos.groupMembers.every(
         (groupMemberId) => {
             if (groupMemberId === jatos.groupMemberId) return true;
-            console.log("return ",jatos.groupSession.get(groupMemberId + key)," for key ",groupMemberId + key);
             return (value !== "*" ? jatos.groupSession.get(groupMemberId + key) === value : jatos.groupSession.get(groupMemberId + key) != null);
         }
     );

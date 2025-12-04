@@ -77,13 +77,11 @@
         function onMemberOpen(memberId) { }
 
         function onMemberClose(memberId) {
-            if (showLog) console.log("Other Player close")
             onOtherPlayerDrop();
         }
 
 
         async function onMemberLeave(memberId) {
-            console.log("Players status : ",jatos.groupSession.get(PLAYERS_METADATA_PROPERTY));
             if (getManagerID() === jatos.groupMemberId) {
                 jatos.groupSession.set(PLAYERS_METADATA_PROPERTY + "." + id, botActive ? "bot" : "leaved")
                     .then(() => console.log("Updated metadata after member leave:", botActive ? "bot" : "leaved"))
@@ -116,7 +114,6 @@
          *  - The last sender is still active (not a leaver)
          *******************************************************/
         function checkBreak() {
-            console.log("assoc index = ",assocIndex , " associationsPerBreak = ",associationsPerBreak);
             return assocIndex % associationsPerBreak === 0;
         }
 
@@ -125,7 +122,6 @@
                 type: jsPsychCallFunction,
                 func: () => {
                     assocIndex += 1;
-                    console.log("updateAssociationState");
                 }
             }
         }

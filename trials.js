@@ -10,10 +10,7 @@ function updateGroupSessionTrial(keys_values, maxRetries = 8) {
             // Block execution for 10 seconds
             let attempt = 0;
             let success = false;
-            console.log("updateGroupSessionTrial!!!!!!!!!!!!!!!!!!!!!!!");
-            console.log("attempts: " + attempt , "maxRetries: ",maxRetries, "success: ",success);
             while (attempt < maxRetries && !success) {
-                console.log("attempt", attempt);
                 try {
                     const gd = jatos.groupSession.getAll();
                     for (let i = 0; i < keys_values.length; i++) {
@@ -102,7 +99,6 @@ function getAllFinishParamTrial(wait_param, wait_msg, values = "*", hide_other_p
                 const vals = Array.isArray(values) ? values : [values];
                 // Check if at least one condition is satisfied
                 const allFinished = vals.some(val => allPlayersFinishParam(wait_param, val));
-                // console.log("allFinished = ",allFinished);
                 if (allFinished || (counterLimit && counter >= counterLimit)) {
                     clearInterval(interval);
                     setTimeout(jsPsych.finishTrial, 100);
@@ -120,10 +116,6 @@ function getSendResults() {
         func: function (done) { // Define the function
             jatos.submitResultData("START_TEMP" + jsPsych.data.get().json() + "END_TEMP")
                 .then(() => {
-                    // console.log('Updated results data')
-                    //jatos.appendResultData(jsPsych.data.getInteractionData())
-                    //    .then(() => console.log("Appended interaction data"))
-                    //    .catch(() => console.log("Error appending interaction data"))
                     done(); // Finish the trial }
                 })
                 .catch(() => {
@@ -329,9 +321,6 @@ function getSlowErrorTrial(){
         },
         choices: "NO_KEYS",
         trial_duration: 3 * 1000,
-        on_finish: function (data) {
-            // console.log("slow_error!!!!!!!!!!!!!!!", data);
-        }
     };
 }
 

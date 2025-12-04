@@ -107,7 +107,6 @@
                     const key = pid + "_" + word;
                     assocs[key] = jatos.groupSession.get(key) || "";
                 });
-                console.log(assocs);
                 const stimulusDiv = getHtmlTag("div", "stimuli_word", "stimuli_word", word);
                 const myValue = assocs[jatos.groupMemberId + "_" + word] || "";
                 const myInput = getHtmlTag("input", "word_input", null, null, { value: myValue, disabled: true });
@@ -162,7 +161,6 @@
             return updateGroupSessionTrial(
                 [[jatos.groupMemberId + '_' + word,
                 () => {
-                    console.log("enteredWord = ",enteredWord)
                     return enteredWord ? enteredWord : NO_RESPONSE;}
                 ]]
             );
