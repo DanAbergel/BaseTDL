@@ -10,8 +10,9 @@ class BaseBot {
 
 
 class JokeBot extends BaseBot {
-    constructor(name) {
-        super(name);  // call BaseBot constructor
+    constructor(seed) {
+        super("JokeBot");  // call BaseBot constructor
+        this.seed = seed;
     }
 
     getAssocWord(word) {
@@ -20,8 +21,9 @@ class JokeBot extends BaseBot {
 }
 
 class SeriousBot extends  BaseBot {
-    constructor(name) {
-        super(name);
+    constructor(seed) {
+        super("SeriousBot");
+        this.seed = seed;
     }
 
     getAssocWord(word) {

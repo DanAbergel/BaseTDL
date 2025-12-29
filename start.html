@@ -18,25 +18,6 @@
     <link rel="stylesheet" href="libs/pure-release-0.6.0/pure-min.css">
     <link rel="stylesheet" type="text/css" href="css/styles.css" />
 
-    <script id="Constants">
-        const AVATARS_LIST = [
-            "bear",
-            "cat",
-            "chicken",
-            "deer",
-            "dog_1",
-            "dog_2",
-            "elephant",
-            "frog",
-            "lion",
-            "monkey",
-            "panda",
-            "seal",
-            "tiger",
-            "turtle"
-        ]
-    </script>
-
     <script id="Variables">
         let my_avatar;
         let my_random_avatar;
@@ -57,24 +38,46 @@
             my_random_avatar = shuffle_seed(avatars_options, 1)[0];
             jsPsych.finishTrial();
         }
+
     </script>
 
     <script id="Trials">
         // Function to select the avatar
         function selectAvatarTrial() {
-            const avatars_options = jatos.groupMemberId === jatos.groupMembers[0] ? AVATARS_LIST.slice(0, 4) : jatos.groupMemberId == jatos.groupMembers[1] ? AVATARS_LIST.slice(5, 9) : AVATARS_LIST.slice(10, 14);
+            const avatars_options = getAvailableAvatars(my_avatar);
+            console.log("AVATAR options ====> ",avatars_options);
             return {
                 type: jsPsychHtmlKeyboardResponse,
                 stimulus: function () {
-                    const choose_your_avatar = getHtmlTag("div", "avatar_text", "avatar_text", "Choose your avatar");
+                    const choose_your_avatar = getHtmlTag(
+                        "div",
+                        "avatar_text",
+                        "avatar_text",
+                        "Choose your avatar"
+                    );
                     const avatar_options_components = avatars_options.map(avatar_name => {
-                        return getHtmlTag("img", "avatar", avatar_name, null, { src: getAvatarPath(avatar_name) })
+                        return getHtmlTag(
+                            "img",
+                            "avatar",
+                            avatar_name,
+                            null,
+                            { src: getAvatarPath(avatar_name) }
+                        );
                     });
-                    return getHtmlTag("div", null, null, [choose_your_avatar, ...avatar_options_components])
+                    return getHtmlTag(
+                        "div",
+                        null,
+                        null,
+                        [choose_your_avatar, ...avatar_options_components]
+                    );
                 },
                 on_load: function () {
                     avatars_options.forEach(avatar_name => {
-                        document.getElementById(avatar_name).addEventListener("click", () => onAvatarClick(avatar_name, avatars_options));
+                        document
+                            .getElementById(avatar_name)
+                            .addEventListener("click", () =>
+                                onAvatarClick(avatar_name, avatars_options)
+                            );
                     });
                 },
                 choices: "NO_KEYS"
@@ -106,11 +109,15 @@
                 properties[TRAINING_WORDS_PROPERTY] = words_list.slice(0, fraction_size);
                 properties[MAIN_WORDS_PROPERTY] = words_list.slice(fraction_size, 2 * fraction_size);
 
-                properties[PLAYERS_METADATA_PROPERTY] = Object.fromEntries(
-                    jatos.groupMembers.map(id => [id, "present"])
+                (jatos.groupMembers || []).forEach(
+                    id => {
+                        properties[id + PLAYERS_METADATA_PROPERTY] = "present";
+                    }
                 );
+
                 jatos.groupSession.setAll(properties)
                     .then(() => { console.log("Group allocation initialized. Allocated group: " + jatos.groupSession.get(ALLOCATED_GROUP_PROPERTY))})
+
             }
             console.log("Global variables initialized");
         }
@@ -135,12 +142,8 @@
         }
 
         function onMemberLeave(id) {
-            // console.log("Players status : ",jatos.groupSession.get(PLAYERS_METADATA_PROPERTY));
-            if (getManagerID() === jatos.groupMemberId) {
-                jatos.groupSession.set(PLAYERS_METADATA_PROPERTY + "." + id, botActive ? "bot" : "leaved")
-                    .then(() => console.log("Updated metadata after member leave:", botActive ? "bot" : "leaved"))
-                    .catch(e => console.log("Error updating metadata", e));
-            }
+            updatePlayersMetadata(id);
+            updateRandomAvatar(id);
         }
 
         jatos.onLoad(function () {

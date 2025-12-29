@@ -8,6 +8,10 @@
   font-family: 'Open Sans', sans-serif;
 }
 
+.word_input {
+  text-align: center;
+}
+
 .scale {
   position: relative;
   width: 300px;
@@ -137,31 +141,39 @@
 }
 
 .left_container {
-  display: block;
-  align-items: center;
-  justify-content: center;
   position: fixed;
-  top: 40%;
+  top: 0;
   left: 0;
-  height: 100%;
+  width: 200px;
+  height: 100vh;
   padding: 10px;
   background-color: #f3f3f3;
   box-shadow: 2px 0px 5px rgba(0, 0, 0, 0.1);
   font-size: 25px;
   font-weight: bold;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
 }
 
 .right_container {
-  display: block;
-  align-items: center;
-  justify-content: center;
   position: fixed;
-  top: 40%;
+  top: 0;
   right: 0;
-  height: 100%;
+  width: 200px;
+  height: 100vh;
   padding: 10px;
   background-color: #f3f3f3;
   box-shadow: -2px 0px 5px rgba(0, 0, 0, 0.1);
+  font-size: 25px;
+  font-weight: bold;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
 }
 
 .gif_loader {
@@ -223,14 +235,13 @@
 
 .timer {
   position: absolute;
-  top: 50px;
-  /* left: 550px; */
+  top: 200px;
+  left: 50%;
+  transform: translateX(-50%);
   font-size: 50px;
   font-weight: bold;
   color: red;
   text-align: center;
-  /* margin-top: 20px; */
-  /* margin-bottom: 20px; */
 }
 
 .avatar {

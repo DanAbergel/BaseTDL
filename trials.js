@@ -260,6 +260,7 @@ function getTextInputTrial(word,countdown = false) {
             jsPsych.pluginAPI.clearAllTimeouts();
             if (!enteredWord) {
                 enteredWord = NO_RESPONSE;
+                console.log("in trials !!! entered word = ",enteredWord);
                 error_strike++;
                 validateErrors();
             }
@@ -415,7 +416,6 @@ function getWordExchangeTrial(word) {
 function getDisplayAnswersTrial(word) {
     return {
         type: jsPsychHtmlKeyboardResponse, // Trial type: HTML display without keyboard interaction
-
         /**
          * Content to display on the screen.
          * Builds a page with:
@@ -428,7 +428,7 @@ function getDisplayAnswersTrial(word) {
             let assocs = {};
             getAllPlayersIds().forEach(pid => {
                 const key = pid + "_" + word;
-                assocs[key] = jatos.groupSession.get(key) || "";
+                assocs[key] = jatos.groupSession.get(key) || NO_RESPONSE;
             });
 
             // Create the area displaying the stimulus
@@ -537,11 +537,11 @@ function break_condition(sync=true) {
         trial_duration: break_duration,
     });
     timeline = [
-        updateGroupSessionTrial(jatos.groupMemberId+COMPLETE_BREAK_EXTENTION,"entered"),
+        updateGroupSessionTrial([[jatos.groupMemberId+COMPLETE_BREAK_EXTENTION,"entered"]]),
         breakTrial(),
         ...getQuestionsTrial(),
         getSendResults(),
-        updateGroupSessionTrial(jatos.groupMemberId+COMPLETE_BREAK_EXTENTION,"finished"),
+        updateGroupSessionTrial([[jatos.groupMemberId+COMPLETE_BREAK_EXTENTION,"finished"]]),
 
     ]
     if(sync){

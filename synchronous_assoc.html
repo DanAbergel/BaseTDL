@@ -18,6 +18,7 @@
     <script src="jatos.js"></script>
     <script src="utils.js"></script>
     <script src="trials.js"></script>
+    <script src="bot.js"></script>
     <link rel="stylesheet" href="libs/pure-release-0.6.0/pure-min.css">
     <link rel="stylesheet" type="text/css" href="css/styles.css" />
 
@@ -35,6 +36,7 @@
         let breakStates = []
         let assocIndex = 0;
         let enteredWord = ""; // Initialize the entered word
+        let bots = [];
     </script>
 
     <script id="Synchronous_helpers">
@@ -66,7 +68,8 @@
             * display the other players' avatars, based on shuffled
             * ordering of participant IDs.
             *******************************************************/
-            const ids = shuffle_seed(getOtherPlayersIds());
+            let questions = [];
+            const ids = shuffle_seed(getAllPlayersIds(true));
             const base = (text, id) =>
                 function () {
                     return getScreen([
@@ -75,14 +78,24 @@
                     "' style='width: 50px; height: 50px;'>"
                 ]);
             };
-            return [
-            createLikertTrial("To what extent do you identify with the following statement:<br><b>I enjoy the game so far</b>", "enjoy"),
-            createLikertTrial(base("To what extent do you identify with the following statement:<br><b>I feel in-sync with</b>", ids[0]), "sync_" + ids[0]),
-            createLikertTrial(base("To what extent do you identify with the following statement:<br><b>I feel in-sync with</b>", ids[1]), "sync_" + ids[1]),
-            createLikertTrial(base("To what extent do you identify with the following statement:<br><b>So far, I like</b>", ids[0]), "like_" + ids[0]),
-            createLikertTrial(base("To what extent do you identify with the following statement:<br><b>So far, I like</b>", ids[1]), "like_" + ids[1])
-        ];
-    }
+            questions.push(
+                createLikertTrial("To what extent do you identify with the following statement:<br><b>I enjoy the game so far</b>", "enjoy")
+            );
+            ids.forEach(id =>
+                questions.push(
+                    createLikertTrial(
+                        base("To what extent do you identify with the following statement:<br><b>I feel in-sync with</b>", id),
+                        "sync_" + id)
+                )
+            );
+            ids.forEach(id =>
+                questions.push(
+                    createLikertTrial(base("To what extent do you identify with the following statement:<br><b>So far, I like</b>", id),
+                        "like_" + id)
+                )
+            );
+            return questions;
+        }
 
         /**
          * SYNC PLAYERS TRIAL
@@ -127,12 +140,16 @@
             associationsPerBreak = cfg_batch.associationsPerBreak || cfg_study.associationsPerBreak || 10;
             // Whether a bot should answer for absent players (default: false)
             botActive = cfg_batch.botActive || cfg_study.botActive || false;
+            console.log("botActive", botActive);
             // Duration of the break between blocks (default: 15 seconds)
             break_duration = cfg_batch.break_duration || cfg_study.break_duration || 15 * 1000
             words_list = shuffle_seed( cfg_batch.words_list || cfg_study.words_list || [] );
             textInput_limit = jatos.batchJsonInput.textInput_limit || jatos.studyJsonInput.textInput_limit || 10
             textStart_limit = jatos.batchJsonInput.textStart_limit || jatos.studyJsonInput.textStart_limit || 1.5
-
+            for(const id of getAllPlayersIds()) {
+                bots.push([id,new SeriousBot(id)]);
+            }
+            console.log("Leaved players replaced by a bot are , ",getPlayersIdsByStatus('bot'));
             // ==========================================================
             // Structured debug logs
             // ==========================================================
@@ -153,6 +170,7 @@
                 type: jsPsychCallFunction,
                 func: () => {
                     assocIndex += 1;
+                    enteredWord = "";
                 }
             }
         }
@@ -161,9 +179,28 @@
             return updateGroupSessionTrial(
                 [[jatos.groupMemberId + '_' + word,
                 () => {
+                    console.log("entered word = ",enteredWord);
                     return enteredWord ? enteredWord : NO_RESPONSE;}
                 ]]
             );
+        }
+
+        function updateGD_leavedPlayers(word) {
+            let updateBots_trial =  {
+                type:jsPsychCallFunction,
+                func: () => {
+                    let key_values = [];
+                    const botsPlayers = getPlayersIdsByStatus('bot');
+                    for (let i=0; i<botsPlayers.length; i++) {
+                        const player = botsPlayers[i];
+                        const key = player + "_" + word;
+                        const value = getBotByPlayerId(player).getAssocWord(word);
+                        key_values.push([key,value]);
+                    }
+                    updateGroupSessionRobust(key_values);
+                }
+            }
+            return makeConditionalTrial(iAmManager,[updateBots_trial]);
         }
     </script>
     <script id="Experiment">
@@ -176,6 +213,7 @@
                 timeline.push(getCountdownTrial(word));
                 timeline.push(getWordExchangeTrial(word));
                 timeline.push(updateGD_trial(word));
+                timeline.push(updateGD_leavedPlayers(word));
                 timeline.push(syncPlayers(word));
                 timeline.push(getDisplayAnswersTrial(word));
                 timeline.push(break_condition());
@@ -194,7 +232,9 @@
         function onClose(){}
         function onMemberOpen(id){}
         function onMemberClose(id){}
-        function onMemberLeave(id){}
+        function onMemberLeave(id){
+            updatePlayersMetadata(id);
+        }
         function onGroupSession(path,op){}
         function printError(message){}
 

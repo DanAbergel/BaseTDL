@@ -81,12 +81,9 @@
         }
 
 
-        async function onMemberLeave(memberId) {
-            if (getManagerID() === jatos.groupMemberId) {
-                jatos.groupSession.set(PLAYERS_METADATA_PROPERTY + "." + id, botActive ? "bot" : "leaved")
-                    .then(() => console.log("Updated metadata after member leave:", botActive ? "bot" : "leaved"))
-                    .catch(e => console.log("Error updating metadata", e));
-            }
+        async function onMemberLeave(id) {
+            updatePlayersMetadata(id);
+            updateRandomAvatar(id);
         }
 
         function printError(errorMsg) {
@@ -96,6 +93,7 @@
         // ===== Helper: read common inputs and session =====
         function initializeSessionVariables() {
             showLog = jatos.batchJsonInput.showLog || jatos.studyJsonInput.showLog || false;
+            botActive = jatos.batchJsonInput.botActive || jatos.studyJsonInput.botActive || false;
             words_list = jatos.groupSession.get(TRAINING_WORDS_PROPERTY);
             break_duration = jatos.batchJsonInput.break_duration || jatos.studyJsonInput.break_duration || 15 * 1000
             textInput_limit = jatos.batchJsonInput.textInput_limit || jatos.studyJsonInput.textInput_limit || 10
@@ -128,6 +126,9 @@
 
 
         function onOpen() {
+            console.log("TRAINING!!!");
+            console.log(jatos.groupSession.get(PLAYERS_METADATA_PROPERTY));
+
             initializeSessionVariables();
 
             let timeline = [];

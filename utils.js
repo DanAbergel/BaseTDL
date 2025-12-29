@@ -18,9 +18,24 @@ const LEAVED_PLAYERS_PROPERTY = 'LEAVED_PLAYERS';
 const MODE_ODDBALL = 'MODE_ODDBALL_PROPERTY';
 const TRAINING_WORDS_PROPERTY = "training_words";
 const MAIN_WORDS_PROPERTY = "main_words";
-const PLAYERS_METADATA_PROPERTY = "players_metadata";
+const PLAYERS_METADATA_PROPERTY = "_players_metadata";
 const SLOW_RESPONSE_THRESHOLD_SECONDS = 4;
-
+const AVATARS_LIST = [
+    "bear",
+    "cat",
+    "chicken",
+    "deer",
+    "dog_1",
+    "dog_2",
+    "elephant",
+    "frog",
+    "lion",
+    "monkey",
+    "panda",
+    "seal",
+    "tiger",
+    "turtle"
+]
 
 function getWords(groupMemberId, extension = "") {
     return jatos.groupSession.get(groupMemberId + extension) || [];
@@ -175,7 +190,7 @@ function getScreen(children_center, hide_other_players = false, show_loading = f
 
     player_containers.push(main_player_container);
     if (!hide_other_players) {
-        const other_players_ids =  others.length === 0 ? getOtherPlayersIds() : others;
+        const other_players_ids =  others.length === 0 ? getAllPlayersIds(true) : others;
         const other_avatars = getOthersAvatars(other_players_ids);
         const other_players = [];
 
@@ -240,7 +255,7 @@ function getScreen(children_center, hide_other_players = false, show_loading = f
 
 
 function allPlayersFinishParam(key, value) {
-    return jatos.groupMembers.every(
+    return getPlayersIdsByStatus('present').every(
         (groupMemberId) => {
             if (groupMemberId === jatos.groupMemberId) return true;
             return (value !== "*" ? jatos.groupSession.get(groupMemberId + key) === value : jatos.groupSession.get(groupMemberId + key) != null);
@@ -288,36 +303,48 @@ function getOtherPlayersWords() {
 }
 
 function getPlayersIdsByStatus(requestedStatus, others = false) {
-    const metadata = jatos.groupSession.get(PLAYERS_METADATA_PROPERTY) || {};
-
-    let ids = Object.entries(metadata)
-        .filter(([id, status]) => status === requestedStatus)
-        .map(([id]) => id)
+    const gs = jatos.groupSession.getAll();
+    const ids = Object.entries(gs)
+        .filter(([key, value]) => key.endsWith(PLAYERS_METADATA_PROPERTY) && value === requestedStatus)
+        .map(([key]) => key.replace(PLAYERS_METADATA_PROPERTY, ""))  // remove suffix → extract player ID
         .sort();
-
     return others ? ids.filter(id => id !== jatos.groupMemberId) : ids;
 }
 
 function getPresentPlayersIds(others=false) {
     return getPlayersIdsByStatus('present', others);
+
 }
 
 function getLeavedPlayersIds(others=false) {
     return getPlayersIdsByStatus('leaved', others);
 }
 
-function getBothPlayersIds(others=false) {
+function getBotPlayersIds(others=false) {
     return getPlayersIdsByStatus('bot', others);
 }
 
-function getAllPlayersIds(others=false) {
-    const metadata = jatos.groupSession.get(PLAYERS_METADATA_PROPERTY) || {};
-    const ids = Object.keys(metadata).sort();
+function getAllPlayersIds(others = false) {
+    const gs = jatos.groupSession.getAll();
+    const ids = Object.keys(gs)
+        .filter(key => key.endsWith(PLAYERS_METADATA_PROPERTY))
+        .map(key => key.replace(PLAYERS_METADATA_PROPERTY, ""))   // remove suffix to get the ID
+        .sort();
     return others ? ids.filter(id => id !== jatos.groupMemberId) : ids;
 }
 
 function getAllOtherPlayersIds() {
     return getAllPlayersIds(true);
+}
+
+function printAllPlayersStatus() {
+    const gs = jatos.groupSession.getAll();  // All group-session data
+    const players = getAllPlayersIds();
+    console.log("PLAYERS = ",players);
+    for (const id of players) {
+        key = id + PLAYERS_METADATA_PROPERTY;
+        console.log("[PLAYER STATUS] ",id , " = ", gs[key]);
+    }
 }
 
 const AVATAR_FALLBACK = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
@@ -374,8 +401,157 @@ function getStatusMemberIds(status){
  * @returns {string|null} First available player ID or null.
  *******************************************************/
 function getManagerID() {
-    const activePlayers = getStatusMemberIds("present");
+    const activePlayers = getPlayersIdsByStatus("present");
     return activePlayers.length > 0 ? activePlayers[0] : null;
 }
 
 
+/**
+ * Robustly updates groupSession data (non-trial version).
+ * - keys_values: array of [key, valueOrFn]
+ * - maxRetries: number of attempts (default: 8)
+ *
+ * Returns: true if success, false if failed after retries.
+ */
+async function updateGroupSessionRobust(keys_values, maxRetries = 8) {
+    console.log("Updating group session session ===================================");
+    let attempt = 0;
+    let success = false;
+
+    while (attempt < maxRetries && !success) {
+        try {
+            const gd = jatos.groupSession.getAll();
+
+            for (let i = 0; i < keys_values.length; i++) {
+                const [key, valueOrFn] = keys_values[i];
+                gd[key] = (typeof valueOrFn === "function")
+                    ? valueOrFn()
+                    : valueOrFn;
+
+                console.log(`[SET GROUP DATA ROBUST] ${key} = ${gd[key]} (attempt ${attempt + 1})`);
+            }
+
+            await jatos.groupSession.setAll(gd);
+            success = true;
+            return true;      // SUCCESS
+        }
+        catch (e) {
+            attempt++;
+            console.error(`[SET GROUP DATA ROBUST] Error attempt ${attempt}:`, e);
+
+            if (attempt >= maxRetries) {
+                console.error(`[SET GROUP DATA ROBUST] FAILED after ${attempt} attempts`);
+                return false; // FAILURE
+            }
+
+            const delay =
+                Math.min(500, 25 * Math.pow(2, attempt - 1))
+                + Math.floor(Math.random() * 50);
+
+            await new Promise(r => setTimeout(r, delay));
+        }
+    }
+
+    return success;
+}
+
+async function updatePlayersMetadata(id) {
+    console.log("Players status before changing:");
+    printAllPlayersStatus();
+
+    console.log("myId =", jatos.groupMemberId,
+        "LeavedPlayerId =", id,
+        "ManagerId =", getManagerID());
+    // Only the manager is allowed to update statuses
+    if (jatos.groupSession.get(id+PLAYERS_METADATA_PROPERTY) === 'present') {
+        const key = id + PLAYERS_METADATA_PROPERTY;
+        const newStatus = botActive ? "bot" : "leaved";
+        console.log("NEW STATUS = ", newStatus);
+        jatos.groupSession
+            .set(key, newStatus)
+            .then(() => {
+                console.log(`Updated metadata for ${id}: ${newStatus}`);
+                console.log("Players status after changing:");
+                printAllPlayersStatus();
+            })
+            .catch(e => {
+                console.log("Error updating metadata", e);
+            });
+    }
+    else {
+        console.log("Not manager — skipping metadata update.");
+    }
+    console.log("jatos.groupSession.get(id+PLAYERS_METADATA_PROPERTY) = ",jatos.groupSession.get(id+PLAYERS_METADATA_PROPERTY));
+    await new Promise(resolve => setTimeout(resolve, 10000));
+}
+
+function getTakenAvatars() {
+    const taken = [];
+    jatos.groupMembers.forEach(memberId => {
+        if (memberId !== jatos.groupMemberId) {
+            const avatar = jatos.groupSession.get(memberId + AVATAR_EXTENSION);
+            if (avatar) taken.push(avatar);
+        }
+    });
+    return taken;
+}
+
+function getMyGroupIndex() {
+    return jatos.groupMembers.indexOf(jatos.groupMemberId);
+}
+
+function getBaseAvatarPool() {
+    const num_players = jatos.groupMembers.length;
+    const num_avatars_per_player = Math.floor(AVATARS_LIST.length / num_players);
+    const myIndex = getMyGroupIndex();
+    if (myIndex === -1) return [];
+    const start = myIndex * num_avatars_per_player;
+    const end = start + num_avatars_per_player;
+    return AVATARS_LIST.slice(start, end);
+}
+
+function getAvailableAvatars(my_avatar = "") {
+    const basePool = getBaseAvatarPool();
+    const takenAvatars = getTakenAvatars();
+    return basePool.filter(
+        avatar => avatar !== my_avatar && !takenAvatars.includes(avatar)
+    );
+}
+
+function assignRandomAvatar() {
+    const available = getAvailableAvatars();
+    console.log(available);
+    if (available.length === 0) return null;
+    my_random_avatar = shuffle_seed(available, 1)[0];
+    return my_random_avatar;
+}
+
+async function updateRandomAvatar(id){
+    console.log("updateRandomAvatar status before changing:");
+    if(jatos.groupSession.get(id + RANDOM_AVATAR_EXTENSION) === undefined){
+        const random_avatar = assignRandomAvatar();
+        updateGroupSessionRobust([
+            [
+                id + RANDOM_AVATAR_EXTENSION,
+                () => {
+                    return random_avatar;
+                },
+            ]
+        ]);
+    }
+}
+
+
+function getBotByPlayerId(playerId) {
+    console.log('#######################');
+    console.log("playerID = ",playerId);
+    for (const [id, botInstance] of bots) {
+        console.log(id);
+        if (id === playerId) return botInstance;
+    }
+    return null; // si pas trouvé
+}
+
+function iAmManager(){
+    return getManagerID() === jatos.groupMemberId;
+}
