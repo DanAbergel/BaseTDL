@@ -72,11 +72,16 @@
             const ids = shuffle_seed(getAllPlayersIds(true));
             const base = (text, id) =>
                 function () {
-                    return getScreen([
-                    text + " <img src='" +
-                    getRandomAvatarById(id) +
-                    "' style='width: 50px; height: 50px;'>"
-                ]);
+                    const centerHtml =
+                        text +
+                        " <img src='" +
+                        getRandomAvatarById(id) +
+                        "' style='width: 50px; height: 50px;'>";
+
+                    return getScreen({
+                        center: [centerHtml],
+                        hideOthers: true
+                    });
             };
             questions.push(
                 createLikertTrial("To what extent do you identify with the following statement:<br><b>I enjoy the game so far</b>", "enjoy")
@@ -114,19 +119,51 @@
          */
         function syncPlayers(word) {
             const stimulus = () => {
-                let assocs = {};
-                const allPlayers = getAllOtherPlayersIds();
-                allPlayers.forEach(pid => {
-                    const key = pid + "_" + word;
-                    assocs[key] = jatos.groupSession.get(key) || "";
+                // --- Other players ---
+                const others = getAllOtherPlayersIds();
+
+                // Everyone else is "loading"
+                const loading = others.map(() => true);
+
+                // No words displayed under other players here
+                const assocs = others.map(() => "");
+
+                // --- Center content ---
+                const stimulusDiv = getHtmlTag(
+                    "div",
+                    "stimuli_word",
+                    "stimuli_word",
+                    word
+                );
+
+                const myValue =
+                    jatos.groupSession.get(jatos.groupMemberId + "_" + word) || "";
+
+                const myInput = getHtmlTag(
+                    "input",
+                    "word_input",
+                    null,
+                    null,
+                    { value: myValue, disabled: true }
+                );
+
+                return getScreen({
+                    center: [stimulusDiv, myInput],
+                    hideOthers: false,
+                    others,
+                    loading,
+                    assocs
                 });
-                const stimulusDiv = getHtmlTag("div", "stimuli_word", "stimuli_word", word);
-                const myValue = assocs[jatos.groupMemberId + "_" + word] || "";
-                const myInput = getHtmlTag("input", "word_input", null, null, { value: myValue, disabled: true });
-                return getScreen([stimulusDiv, myInput], false, true);
             };
 
-            return getAllFinishParamTrial("_" + word, "", "*", true, 600, stimulus);
+            return getAllFinishParamTrial(
+                "_" + word,
+                "",
+                "*",
+                true,
+                600,
+                stimulus
+            );
         }
     </script>
 

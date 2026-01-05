@@ -48,7 +48,13 @@
                     });
                     const scale = getHtmlTag("div", "scale", "scale", [start_label, end_label], { "style": "visibility:hidden" })
 
-                    return getScreen([line_1, line_2, line_3, line_4, scale], true, false);
+                    return getScreen({
+                        center: [line_1, line_2, line_3, line_4, scale],
+                        hideOthers: true,
+                        others: [],
+                        loading: [],
+                        assocs: []
+                    });
 
                 },
                 data: {
@@ -78,8 +84,20 @@
             return {
                 type: jsPsychHtmlKeyboardResponse,
                 stimulus: function () {
-                    const break_html = getHtmlTag("div", "break", "break", "Break time! Please take a short break. The experiment will continue shortly.");
-                    return getScreen([break_html], true, false);
+                    const break_html = getHtmlTag(
+                        "div",
+                        "break",
+                        "break",
+                        "Break time! Please take a short break. The experiment will continue shortly."
+                    );
+
+                    return getScreen({
+                        center: break_html,
+                        hideOthers: true,
+                        others: [],
+                        loading: [],
+                        assocs: []
+                    });
                 },
                 choices: "NO_KEYS",
                 trial_duration: parseInt(jatos.batchJsonInput.break_time || jatos.studyJsonInput.break_time || 10) * 1000,

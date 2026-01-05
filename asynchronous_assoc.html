@@ -21,7 +21,86 @@
     <script src="trials.js"></script>
     <link rel="stylesheet" href="libs/pure-release-0.6.0/pure-min.css">
     <link rel="stylesheet" type="text/css" href="css/styles.css" />
+    <script id="Asynchronous Trials">
+        function getArrowForSide(side) {
+            switch (side) {
+                case "left":
+                    return "⇐";
+                case "right":
+                    return "⇒";
+                case "top":
+                    return "⇑";
+                default:
+                    return "";
+            }
+        }
 
+        function getLoadingTrial() {
+            return {
+                type: jsPsychHtmlKeyboardResponse,
+                stimulus: function () {
+                    const sender = getSender();
+                    const currentTurn = getReceiver();
+                    const lastWord = getLastWord();
+
+                    const others = getAllPlayersIds(true);
+                    const n = others.length;
+
+                    // Only the current turn player is loading
+                    const loading = others.map(id => id === currentTurn);
+                    const assocs = others.map((id, idx) => {
+                        const layout = getOtherPlayerLayout(idx, n);
+
+                        // Active player → show last word
+                        if (id === currentTurn) {
+                            return lastWord || "";
+                        }
+                        // Sender → show arrow based on position
+                        if (id === sender) {
+                            return getArrowForSide(layout.side);
+                        }
+                        return "";
+                    });
+
+                    return getScreen({
+                        center: [],
+                        hideOthers: false,
+                        others,
+                        loading,
+                        assocs
+                    });
+                },
+                choices: "NO_KEYS",
+                on_load: function () {
+                    const currentTurn = getReceiver();
+
+                    const checkInterval = setInterval(function () {
+                        const receiver = getReceiver();
+                        if (receiver !== currentTurn || receiver === jatos.groupMemberId || checkBreak() == true) {
+                            clearInterval(checkInterval);
+                            jsPsych.finishTrial();
+                        }
+                        if (iAmManager() && isLeaver(currentTurn)) {
+                            setTimeout(() => {
+                                getBotCheckTrial();
+                            }, 4000);
+                        }
+                    }, 10); // Check every 100 milisecond
+                },
+                on_finish: function (data) {
+                    const group_data = getGroupData();
+                    const lastWord = getLastWord();
+                    const currentTurn = getReceiver();
+                    const sender = getSender();
+                    data.trialIndex = group_data.length;
+                    data.entered_word = lastWord;
+                    data.current_turn = sender;
+                    data.next_turn = currentTurn;
+                    data.block = block;
+                }
+            }
+        }
+    </script>
     <script id="Helpers">
         /*******************************************************
          * CHECK BLOCK BREAK BY COUNT
@@ -34,6 +113,68 @@
         function checkBreak() {
             return getGDLength() > 0 && getGDLength() % trials_number === 0 && !isLeaver(getSender());
         }
+    </script>
+    <script id="Wrappers">
+        function getConditionalCountdownTrial(word){
+            const condition = () =>{
+                turn === jatos.groupMemberId ||
+                (getBotPlayersIds().includes(turn) && iAmManager())
+            };
+            return makeConditionalTrial(
+                condition,
+                [getCountdownTrial(word)]
+            )
+        }
+
+    </script>
+    <script id="Experiment">
+        function onOpen(){
+            initializeSessionVariables();
+            let timeline = [];
+            // timeline.push(...manageFullScreenTrial());
+            words_list.forEach(word => {
+                timeline.push(updateAssociationState(word));
+                timeline.push(getConditionalCountdownTrial(word));
+                timeline.push();
+                timeline.push(getWordExchangeTrial(word));
+                timeline.push(updateGD_trial(word));
+                timeline.push(updateGD_leavedPlayers(word));
+                timeline.push(syncPlayers(word));
+                timeline.push(getDisplayAnswersTrial(word));
+                timeline.push(break_condition());
+            });
+
+            jsPsych.run(timeline);
+
+            // Add metadata to the jsPsych dataset
+            jsPsych.data.addProperties({
+                groupAllocation: jatos.groupSession.get(ALLOCATED_GROUP_PROPERTY),
+                ProlificID: jatos.urlQueryParameters.PROLIFIC_PID,
+                ProlificStudyID: jatos.urlQueryParameters.STUDY_ID,
+                ProlificSessionID: jatos.urlQueryParameters.SESSION_ID
+            });
+        }
+        function onClose(){}
+        function onMemberOpen(id){}
+        function onMemberClose(id){}
+        function onMemberLeave(id){
+            updatePlayersMetadata(id);
+        }
+        function onGroupSession(path,op){}
+        function printError(message){}
+
+        jatos.onLoad(
+            function () {
+                jatos.joinGroup({
+                    "onOpen": onOpen,
+                    "onClose": onClose,
+                    "onGroupSession": onGroupSession,
+                    "onMemberOpen": onMemberOpen,
+                    "onMemberClose": onMemberClose,
+                    "onMemberLeave": onMemberLeave,
+                    "onError": printError,
+                });
+            });
     </script>
 
 

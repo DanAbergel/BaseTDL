@@ -178,79 +178,154 @@ function getOtherPlayersIds() {
     return jatos.groupMembers.filter(id => id !== jatos.groupMemberId).sort();
 }
 
-function getScreen(children_center, hide_other_players = false, show_loading = false, other_words = [],others = []) {
+/**
+ * Decide layout (CSS class + loader side) for other players
+ * based ONLY on their index and total count.
+ *
+ * This function is PURE and PRESENTATIONAL.
+ *
+ * @param {number} idx - Index of the player (0-based)
+ * @param {number} n   - Total number of other players
+ * @returns {{ className: string, side: "left"|"right" }}
+ */
+function getOtherPlayerLayout(idx, n) {
+
+    // ===== 1 other player =====
+    if (n === 1) {
+        return {
+            className: "up_container",
+            side: "left"
+        };
+    }
+
+    // ===== 2 other players =====
+    if (n === 2) {
+        return idx === 0
+            ? { className: "up_left_container",  side: "left"  }
+            : { className: "up_right_container", side: "right" };
+    }
+
+    // ===== 3 other players =====
+    if (n === 3) {
+        if (idx === 0) {
+            return { className: "up_container", side: "left" };
+        }
+        if (idx === 1) {
+            return { className: "left_container", side: "left" };
+        }
+        return { className: "right_container", side: "right" };
+    }
+
+    // ===== 4 other players =====
+    if (n === 4) {
+        const layouts = [
+            { className: "up_container",    side: "left"  },
+            { className: "left_container",  side: "left"  },
+            { className: "right_container", side: "right" },
+            { className: "down_container",  side: "right" }
+        ];
+        return layouts[idx] || layouts[0];
+    }
+
+    // ===== Fallback (safety) =====
+    return { className: "up_container", side: "left" };
+}
+
+/**
+ * Improved getScreen2 — option-based, intention-driven API.
+ *
+ * This function is PURELY PRESENTATIONAL:
+ * it renders the screen based only on its arguments,
+ * without relying on groupData, turns, or implicit game logic.
+ *
+ * @param {Object} options
+ * @param {string|Array<string>} options.center - HTML content for the center of the screen
+ * @param {boolean} [options.hideOthers=false] - Whether to hide other players
+ * @param {string[]} [options.others=[]] - IDs of the other players (excluding self)
+ * @param {boolean[]} [options.loading=[]] - Loader flags per other player
+ * @param {string[]} [options.assocs=[]] - Optional text under each other player
+ *
+ * @returns {string} Full screen HTML
+ */
+function getScreen({
+    center,
+    hideOthers = false,
+    others = [],
+    loading = [],
+    assocs = []
+}) {
     const player_containers = [];
 
-    // Main Player Container (center bottom)
-    const main_player_avatar = getHtmlTag("img", "avatar", "avatar", null, { src: getAvatarById(jatos.groupMemberId) });
-    const main_player = getHtmlTag("div", "loading_player", "loading_player", main_player_avatar);
-    const main_player_container = getHtmlTag("div", "down_container", "down_container", main_player);
-    let loaders = [false, false];
+    // --- Main player (bottom / center) ---
+    const mainAvatar = getHtmlTag(
+        "img",
+        "avatar",
+        "avatar",
+        null,
+        { src: getAvatarById(jatos.groupMemberId) }
+    );
 
+    const mainPlayer = getHtmlTag(
+        "div",
+        "loading_player",
+        "loading_player",
+        mainAvatar
+    );
 
-    player_containers.push(main_player_container);
-    if (!hide_other_players) {
-        const other_players_ids =  others.length === 0 ? getAllPlayersIds(true) : others;
-        const other_avatars = getOthersAvatars(other_players_ids);
-        const other_players = [];
+    player_containers.push(
+        getHtmlTag("div", "down_container", "down_container", mainPlayer)
+    );
 
-        if (show_loading) {
-            let group_data = getGroupData();
+    // --- Other players ---
+    if (!hideOthers && others.length > 0) {
 
-            // Safely read last turn (group_data may be empty at the beginning)
-            let lastTurn = null;
-            const last = group_data[group_data.length - 1];
-            if (Array.isArray(last) && last.length > 1) {
-                lastTurn = last[1];
-            }
+        const n = others.length;
 
-            // Set loaders only if we have a valid lastTurn and at least one other player
-            if (lastTurn !== null && other_players_ids.length > 0) {
-                if (lastTurn === other_players_ids[0]) {
-                    loaders[0] = true;
-                } else if (other_players_ids.length > 1 && lastTurn === other_players_ids[1]) {
-                    loaders[1] = true;
-                }
-            }
-        }
-        if(other_avatars.length > 0) {
-            if (other_players_ids.length === 1) {
-                if (other_words.length > 0) {
-                    other_players.push(getSinglePlayerContainerGeneric(other_avatars[0], "up_container", show_loading, other_words[0]));
-                } else {
-                    other_players.push(getSinglePlayerContainerGeneric(other_avatars[0], "up_container", show_loading));
-                }
-            } else if (other_players_ids.length === 2) {
-                if (other_words.length > 0) {
-                    other_players.push(getSinglePlayerContainerGeneric(other_avatars[1], "up_right_container", (show_loading && loaders[1]), other_words[1], false, "right"));
-                    other_players.push(getSinglePlayerContainerGeneric(other_avatars[0], "up_left_container", (show_loading && loaders[0]), other_words[0], false, "left"));
-                }
-                else {
-                    other_players.push(getSinglePlayerContainerGeneric(other_avatars[1], "up_right_container", (show_loading && loaders[1]), "", false, "right"));
-                    other_players.push(getSinglePlayerContainerGeneric(other_avatars[0], "up_left_container", (show_loading && loaders[0]), "", false, "left"));
-                }
+        // Normalize inputs defensively
+        const safeLoading = Array.from({ length: n }, (_, i) => !!loading[i]);
+        const safeAssocs  = Array.from({ length: n }, (_, i) => assocs[i] ?? "");
 
-            } else {
-                if (other_words.length > 0) {
-                    other_players.push(getSinglePlayerContainerGeneric(other_avatars[0], "up_container", show_loading, other_words[0]));
-                    other_players.push(getSinglePlayerContainerGeneric(other_avatars[1], "right_container", show_loading, other_words[1], false, "right"));
-                    other_players.push(getSinglePlayerContainerGeneric(other_avatars[2], "left_container", show_loading, other_words[2], false, "left"));
-                }
-                else {
-                    other_players.push(getSinglePlayerContainerGeneric(other_avatars[0], "up_container", show_loading));
-                    other_players.push(getSinglePlayerContainerGeneric(other_avatars[1], "right_container", show_loading, "", false, "right"));
-                    other_players.push(getSinglePlayerContainerGeneric(other_avatars[2], "left_container", show_loading, "", false, "left"));
-                }
-            }
-        }
+        const other_players_html = [];
 
-        const other_players_container = getHtmlTag("div", "other_players_container", "other_players_container", other_players);
-        player_containers.push(other_players_container);
+        others.forEach((playerId, idx) => {
+            const layout = getOtherPlayerLayout(idx, n);
 
+            other_players_html.push(
+                getSinglePlayerContainerGeneric(
+                    getAvatarSafe(playerId),
+                    layout.className,
+                    safeLoading[idx],
+                    safeAssocs[idx],
+                    false,
+                    layout.side
+                )
+            );
+        });
+
+        player_containers.push(
+            getHtmlTag(
+                "div",
+                "other_players_container",
+                "other_players_container",
+                other_players_html
+            )
+        );
     }
-    const center_container = getHtmlTag("div", "center_container", "center_container", children_center);
-    const screen = getHtmlTag("div", "screen", "screen", [...player_containers, center_container]);
-    return screen;
+
+    // --- Center content ---
+    const center_container = getHtmlTag(
+        "div",
+        "center_container",
+        "center_container",
+        center
+    );
+
+    return getHtmlTag(
+        "div",
+        "screen",
+        "screen",
+        [...player_containers, center_container]
+    );
 }
 
 
@@ -320,8 +395,8 @@ function getLeavedPlayersIds(others=false) {
     return getPlayersIdsByStatus('leaved', others);
 }
 
-function getBotPlayersIds(others=false) {
-    return getPlayersIdsByStatus('bot', others);
+function getBotPlayersIds() {
+    return getPlayersIdsByStatus('bot');
 }
 
 function getAllPlayersIds(others = false) {
@@ -352,7 +427,7 @@ const AVATAR_FALLBACK = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAA
 // Returns the avatar path using the last filename stored in cache.
 // This way the avatar remains visible even if the player leaves (the groupSession entry may disappear).
 function getAvatarSafe(memberId){
-    const filename = avatarsCache[memberId] || jatos.groupSession.get(memberId + RANDOM_AVATAR_EXTENSION);
+    const filename = jatos.groupSession.get(memberId + RANDOM_AVATAR_EXTENSION);
     if (!filename) return AVATAR_FALLBACK;
     const p = getAvatarPath(filename);
     return p ? p : AVATAR_FALLBACK;

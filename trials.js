@@ -1,5 +1,11 @@
 // Helper to create conditional trials
-const makeConditionalTrial = (conditionFn, timeline) => ({ conditional_function: conditionFn, timeline });
+const makeConditionalTrial = (conditionFn, timeline) => (
+    { conditional_function: conditionFn, timeline:timeline }
+);
+
+const makeConditionalLoopingTrial = (conditionFn, timeline) => (
+    { loop_function: conditionFn, timeline:timeline }
+);
 
 // Function to get the update trial
 function updateGroupSessionTrial(keys_values, maxRetries = 8) {
@@ -49,15 +55,32 @@ function getWaitTrial(wait_param, wait_msg, hide_other_player_avatar = true, cou
     return {
         type: jsPsychHtmlKeyboardResponse,
         stimulus: function () {
-            const wait_html = getHtmlTag("div", "wait", "wait", wait_msg, hide_other_player_avatar);
-            return getScreen([], [wait_html], [], []);
+            const wait_html = getHtmlTag(
+                "div",
+                "wait",
+                "wait",
+                wait_msg,
+                hide_other_player_avatar
+            );
+
+            return getScreen({
+                center: wait_html,
+                hideOthers: hide_other_player_avatar,
+                others: getAllOtherPlayersIds(),
+                loading: getAllOtherPlayersIds().map(() => true),
+                assocs: []
+            });
         },
         choices: "NO_KEYS",
         on_load: function () {
-            let counter = 0; // Initialize counter for skipping to ratings if the other participant is non-responsive
+            let counter = 0;
             let interval = setInterval(function () {
                 if (counterLimit > 0) counter++;
-                if (jatos.groupSession.get(wait_param) || (counterLimit > 0 && counter >= counterLimit)) {
+
+                if (
+                    jatos.groupSession.get(wait_param) ||
+                    (counterLimit > 0 && counter >= counterLimit)
+                ) {
                     clearInterval(interval);
                     setTimeout(function () {
                         jsPsych.finishTrial();
@@ -83,13 +106,27 @@ function getAllFinishParamTrial(wait_param, wait_msg, values = "*", hide_other_p
     return {
         type: jsPsychHtmlKeyboardResponse,
         stimulus: function () {
-            if (typeof stimulusFn === "function") {
+           if (typeof stimulusFn === "function") {
                 return stimulusFn();
             }
-            else{
-                const wait_html = getHtmlTag("div", "wait", "wait", wait_msg, hide_other_player_avatar);
-                return getScreen([wait_html], true);
-            }},
+            else {
+                const wait_html = getHtmlTag(
+                    "div",
+                    "wait",
+                    "wait",
+                    wait_msg,
+                    hide_other_player_avatar
+                );
+
+                return getScreen({
+                    center: wait_html,
+                    hideOthers: hide_other_player_avatar,
+                    others: getAllOtherPlayersIds(),
+                    loading: getAllOtherPlayersIds().map(() => true),
+                    assocs: []
+                });
+            }
+        },
         choices: "NO_KEYS",
         on_load: function () {
             let counter = 0; // Initialize counter for skipping if the other participant is non-responsive
@@ -202,15 +239,16 @@ function getCountdownTrial(word ,time= 15) {
         choices: [' '], // Spacebar
         trial_duration: time * 1000,
         stimulus: () => {
-            const [stimulus_word_html,timer_html] = createStimulusHTML(word,true);
-            return getScreen(
-                [timer_html, stimulus_word_html],
-                false, // hide_other_players
-                false, // show_loading
-                [],    // other_words
-                getAllOtherPlayersIds()
-            );
-            },
+            const [stimulus_word_html, timer_html] = createStimulusHTML(word, true);
+
+            return getScreen({
+                center: [timer_html, stimulus_word_html],
+                hideOthers: false,
+                others: getAllOtherPlayersIds(),
+                loading: getAllOtherPlayersIds().map(() => false),
+                assocs: []
+            });
+        },
         on_start: function () {
             // Start the visual timer and keep the interval ID in a local var
             this.__timerId = startTimer(time * 1000);
@@ -245,9 +283,22 @@ function getTextInputTrial(word,countdown = false) {
         choices: ['enter'],
         trial_duration: textInput_limit * 1000,
         stimulus: () => {
-            const [stimuli_html, timer_html] = createStimulusHTML(word,countdown);
-            const input_html = getHtmlTag("input", "word_input sent-word", "word_input", null, { type: "text", autocomplete: "off" });
-            return getScreen([stimuli_html,input_html], false, false, [], getAllOtherPlayersIds());
+            const [stimuli_html, timer_html] = createStimulusHTML(word, countdown);
+            const input_html = getHtmlTag(
+                "input",
+                "word_input sent-word",
+                "word_input",
+                null,
+                { type: "text", autocomplete: "off" }
+            );
+
+            return getScreen({
+                center: [stimuli_html, timer_html, input_html],
+                hideOthers: false,
+                others: getAllOtherPlayersIds(),
+                loading: getAllOtherPlayersIds().map(() => false),
+                assocs: []
+            });
         },
         on_load: () => {
             startTimer = performance.now();
@@ -281,8 +332,20 @@ function getErrorTrial(){
     return {
         type: jsPsychHtmlKeyboardResponse,
         stimulus: function () {
-            const error_html = getHtmlTag("div", "error", "error", "YOU MUST WRITE AN ASSOCIATION");
-            return getScreen([error_html], false, false, [], getAllOtherPlayersIds());
+            const error_html = getHtmlTag(
+                "div",
+                "error",
+                "error",
+                "YOU MUST WRITE AN ASSOCIATION"
+            );
+
+            return getScreen({
+                center: error_html,
+                hideOthers: false,
+                others: getAllOtherPlayersIds(),
+                loading: getAllOtherPlayersIds().map(() => false),
+                assocs: []
+            });
         },
         choices: "NO_KEYS",
         trial_duration: 3 * 1000,
@@ -310,15 +373,20 @@ function getSlowErrorTrial(){
     return {
         type: jsPsychHtmlKeyboardResponse,
         stimulus: function () {
-            const error_html = getHtmlTag("div", "slow_error", "slow_error", SLOW_RESPONSE_TEXT);
-            const otherPlayers = getAllOtherPlayersIds();
-            return getScreen(
-                [error_html],
-                false, // hide_other_players
-                false, // show_loading
-                [],    // other_words
-                otherPlayers // others
+            const error_html = getHtmlTag(
+                "div",
+                "slow_error",
+                "slow_error",
+                SLOW_RESPONSE_TEXT
             );
+
+            return getScreen({
+                center: error_html,
+                hideOthers: false,
+                others: getAllOtherPlayersIds(),
+                loading: getAllOtherPlayersIds().map(() => false),
+                assocs: []
+            });
         },
         choices: "NO_KEYS",
         trial_duration: 3 * 1000,
@@ -335,10 +403,35 @@ function getChooseReceiverTrial(){
             const otherPlayers = getAllOtherPlayersIds();
             const leftPlayer = otherPlayers[0];
             const rightPlayer = otherPlayers[1];
-            const instruction = "Choose the next player to receive the word:<br>";
-            const leftChoice = `← Left (Player ${allPlayers.indexOf(leftPlayer) + 1}) | `;
-            const rightChoice = `(Player ${allPlayers.indexOf(rightPlayer) + 1}) Right →`;
-            return getScreen([instruction, leftChoice, rightChoice], false, false, [], otherPlayers);
+
+            const instruction = getHtmlTag(
+                "div",
+                "instruction",
+                "instruction",
+                "Choose the next player to receive the word:"
+            );
+
+            const leftChoice = getHtmlTag(
+                "div",
+                "choice_left",
+                "choice_left",
+                `← Left (Player ${allPlayers.indexOf(leftPlayer) + 1})`
+            );
+
+            const rightChoice = getHtmlTag(
+                "div",
+                "choice_right",
+                "choice_right",
+                `(Player ${allPlayers.indexOf(rightPlayer) + 1}) Right →`
+            );
+
+            return getScreen({
+                center: [instruction, leftChoice, rightChoice],
+                hideOthers: false,
+                others: otherPlayers,
+                loading: otherPlayers.map(() => false),
+                assocs: []
+            });
         },
         trial_duration: 15000,
         on_finish: function (data) {
@@ -366,7 +459,20 @@ function getReceiverErrorTrial(){
     return {
         type: jsPsychHtmlKeyboardResponse,
         stimulus: function () {
-            return getScreen([getHtmlTag("div", "error", "error", "You must choose a player to send the word to.")]);
+            const error_html = getHtmlTag(
+                "div",
+                "error",
+                "error",
+                "You must choose a player to send the word to."
+            );
+
+            return getScreen({
+                center: error_html,
+                hideOthers: false,
+                others: getAllOtherPlayersIds(),
+                loading: getAllOtherPlayersIds().map(() => false),
+                assocs: []
+            });
         },
         choices: "NO_KEYS",
         trial_duration: 3000, // 3 seconds warning
@@ -443,8 +549,14 @@ function getDisplayAnswersTrial(word) {
                 .filter(([key]) => key !== jatos.groupMemberId + "_" + word)
                 .map(([, value]) => value);
 
-            // Assemble the complete screen (stimulus + your word + other players' words)
-            return getScreen([stimulusDiv, myInput], false, false, otherPlayersWords);
+          // Assemble the complete screen (stimulus + your word + other players' words)
+            return getScreen({
+                center: [stimulusDiv, myInput],
+                hideOthers: false,
+                others: getAllOtherPlayersIds(),
+                loading: getAllOtherPlayersIds().map(() => false),
+                assocs: otherPlayersWords
+            });
         },
 
         choices: "NO_KEYS", // Disables all keys (no keyboard interaction)
@@ -495,9 +607,22 @@ function manageFullScreenTrial() {
 function getWaitAllPlayersTrial(wait_param, wait_msg, hide_other_player_avatar = true, counterLimit = 600) {
     return {
         type: jsPsychHtmlKeyboardResponse,
-        stimulus: function() {
-            const wait_html = getHtmlTag("div", "wait", "wait", wait_msg, hide_other_player_avatar);
-            return getScreen([wait_html], true);
+        stimulus: function () {
+            const wait_html = getHtmlTag(
+                "div",
+                "wait",
+                "wait",
+                wait_msg,
+                hide_other_player_avatar
+            );
+
+            return getScreen({
+                center: wait_html,
+                hideOthers: hide_other_player_avatar,
+                others: getAllOtherPlayersIds(),
+                loading: getAllOtherPlayersIds().map(() => true),
+                assocs: []
+            });
         },
         choices: "NO_KEYS",
         on_load: function() {
@@ -583,10 +708,22 @@ function createLikertTrial(promptHtml, name) {
 function getFixationCrossTrial(time_seconds=1) {
     return {
         type: jsPsychHtmlKeyboardResponse,
-        stimulus: function () {
-            fixation_html = getHtmlTag("div", "fixation", "fixation", "+");
-            return getScreen([fixation_html], true);
-        },
+    stimulus: function () {
+        const fixation_html = getHtmlTag(
+            "div",
+            "fixation",
+            "fixation",
+            "+"
+        );
+
+        return getScreen({
+            center: fixation_html,
+            hideOthers: true,
+            others: getAllOtherPlayersIds(),
+            loading: getAllOtherPlayersIds().map(() => false),
+            assocs: []
+        });
+    },
         choices: "NO_KEYS",
         trial_duration: time_seconds*1000,
     };
