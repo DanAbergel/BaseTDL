@@ -18,8 +18,9 @@ const LEAVED_PLAYERS_PROPERTY = 'LEAVED_PLAYERS';
 const MODE_ODDBALL = 'MODE_ODDBALL_PROPERTY';
 const TRAINING_WORDS_PROPERTY = "training_words";
 const MAIN_WORDS_PROPERTY = "main_words";
-const PLAYERS_METADATA_PROPERTY = "_players_metadata";
 const SLOW_RESPONSE_THRESHOLD_SECONDS = 4;
+const HUMAN_PLAYERS_PROPERTY = "HUMAN_PLAYERS_PROPERTY";
+const BOT_PLAYERS_PROPERTY = "BOT_PLAYERS_PROPERTY";
 const AVATARS_LIST = [
     "bear",
     "cat",
@@ -90,10 +91,10 @@ function getRandomAvatarById(groupMemberId = jatos.groupMemberId) {
 }
 
 
-function getOthersAvatars(other_players_ids) {
+function getAllAvatars(others=false) {
     const all_properties = jatos.groupSession.getAll();
-    return other_players_ids
-        .map((groupMemberId) => all_properties[groupMemberId + RANDOM_AVATAR_EXTENSION])
+    return getAllPlayersIds(others)
+        .map((id) => all_properties[id + RANDOM_AVATAR_EXTENSION])
         .filter(filename => filename !== undefined && filename !== null)
         .map(filename => getAvatarPath(filename));
 }
@@ -194,41 +195,28 @@ function getOtherPlayerLayout(idx, n) {
     if (n === 1) {
         return {
             className: "up_container",
-            side: "left"
+            side: "up"
         };
     }
-
     // ===== 2 other players =====
     if (n === 2) {
         return idx === 0
-            ? { className: "up_left_container",  side: "left"  }
-            : { className: "up_right_container", side: "right" };
+            ? { className: "up_left_container",  side: "up_left"  }
+            : { className: "up_right_container", side: "up_right" };
     }
 
     // ===== 3 other players =====
     if (n === 3) {
         if (idx === 0) {
-            return { className: "up_container", side: "left" };
+            return { className: "up_container", side: "up" };
         }
         if (idx === 1) {
             return { className: "left_container", side: "left" };
         }
         return { className: "right_container", side: "right" };
     }
-
-    // ===== 4 other players =====
-    if (n === 4) {
-        const layouts = [
-            { className: "up_container",    side: "left"  },
-            { className: "left_container",  side: "left"  },
-            { className: "right_container", side: "right" },
-            { className: "down_container",  side: "right" }
-        ];
-        return layouts[idx] || layouts[0];
-    }
-
     // ===== Fallback (safety) =====
-    return { className: "up_container", side: "left" };
+    return { className: "up_container", side: "top" };
 }
 
 /**
@@ -284,7 +272,6 @@ function getScreen({
         // Normalize inputs defensively
         const safeLoading = Array.from({ length: n }, (_, i) => !!loading[i]);
         const safeAssocs  = Array.from({ length: n }, (_, i) => assocs[i] ?? "");
-
         const other_players_html = [];
 
         others.forEach((playerId, idx) => {
@@ -329,13 +316,24 @@ function getScreen({
 }
 
 
-function allPlayersFinishParam(key, value) {
-    return getPlayersIdsByStatus('present').every(
-        (groupMemberId) => {
-            if (groupMemberId === jatos.groupMemberId) return true;
-            return (value !== "*" ? jatos.groupSession.get(groupMemberId + key) === value : jatos.groupSession.get(groupMemberId + key) != null);
-        }
+function numPlayersFinishParam(key, value) {
+    return getPlayersIdsByStatus('present').reduce(
+        (count, groupMemberId) => {
+            if (groupMemberId === jatos.groupMemberId) return count;
+            const v = jatos.groupSession.get(groupMemberId + key);
+            const ok = (value !== "*") ? v === value : v != null;
+            return ok ? count + 1 : count;
+        },
+        0
     );
+}
+
+function allPlayersFinishParam(key, value) {
+    const numPlayersFinished = numPlayersFinishParam(key, value);
+    // console.log("numPlayersFinished = ", numPlayersFinished);
+    const numPresentPlayers = getPlayersIdsByStatus('present',true).length;
+    // console.log("numPlayers present = ", );
+    return  numPlayersFinished === numPresentPlayers;
 }
 
 
@@ -378,12 +376,13 @@ function getOtherPlayersWords() {
 }
 
 function getPlayersIdsByStatus(requestedStatus, others = false) {
-    const gs = jatos.groupSession.getAll();
-    const ids = Object.entries(gs)
-        .filter(([key, value]) => key.endsWith(PLAYERS_METADATA_PROPERTY) && value === requestedStatus)
-        .map(([key]) => key.replace(PLAYERS_METADATA_PROPERTY, ""))  // remove suffix → extract player ID
-        .sort();
-    return others ? ids.filter(id => id !== jatos.groupMemberId) : ids;
+    let ids = []
+    if(requestedStatus === "present") ids = jatos.groupChannels;
+    else if(requestedStatus === "leaved") ids = jatos.groupSession.get(HUMAN_PLAYERS_PROPERTY).filter(id => !jatos.groupChannels.includes(id));
+    else if(requestedStatus === "bot") ids = jatos.groupSession.get(BOT_PLAYERS_PROPERTY);
+    else console.error("[BAD REQUEST ERROR] ", requestedStatus);
+    if(others) ids = ids.filter(id => id !== jatos.groupMemberId);
+    return ids;
 }
 
 function getPresentPlayersIds(others=false) {
@@ -400,11 +399,9 @@ function getBotPlayersIds() {
 }
 
 function getAllPlayersIds(others = false) {
-    const gs = jatos.groupSession.getAll();
-    const ids = Object.keys(gs)
-        .filter(key => key.endsWith(PLAYERS_METADATA_PROPERTY))
-        .map(key => key.replace(PLAYERS_METADATA_PROPERTY, ""))   // remove suffix to get the ID
-        .sort();
+    const humanIds = jatos.groupSession.get(HUMAN_PLAYERS_PROPERTY) || [];
+    const botIds   = jatos.groupSession.get(BOT_PLAYERS_PROPERTY) || [];
+    const ids = [...humanIds, ...botIds];
     return others ? ids.filter(id => id !== jatos.groupMemberId) : ids;
 }
 
@@ -413,13 +410,9 @@ function getAllOtherPlayersIds() {
 }
 
 function printAllPlayersStatus() {
-    const gs = jatos.groupSession.getAll();  // All group-session data
-    const players = getAllPlayersIds();
-    console.log("PLAYERS = ",players);
-    for (const id of players) {
-        key = id + PLAYERS_METADATA_PROPERTY;
-        console.log("[PLAYER STATUS] ",id , " = ", gs[key]);
-    }
+    console.log("Present Players : ",getPlayersIdsByStatus("present"));
+    console.log("Leaved Players : ",getPlayersIdsByStatus("leaved"));
+    console.log("Bot Players : ",getPlayersIdsByStatus("bot"));
 }
 
 const AVATAR_FALLBACK = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
@@ -457,13 +450,6 @@ function isLeaver(id){
         return false;
     }
     return leavedPlayers.includes(id);
-}
-
-function getStatusMemberIds(status){
-    const metadata = jatos.groupSession.get(PLAYERS_METADATA_PROPERTY);
-    return Object.entries(metadata)
-        .filter(([id, status]) => status === status)
-        .map(([id]) => id);
 }
 
 /*******************************************************
@@ -530,43 +516,23 @@ async function updateGroupSessionRobust(keys_values, maxRetries = 8) {
     return success;
 }
 
-async function updatePlayersMetadata(id) {
-    console.log("Players status before changing:");
-    printAllPlayersStatus();
-
-    console.log("myId =", jatos.groupMemberId,
-        "LeavedPlayerId =", id,
-        "ManagerId =", getManagerID());
-    // Only the manager is allowed to update statuses
-    if (jatos.groupSession.get(id+PLAYERS_METADATA_PROPERTY) === 'present') {
-        const key = id + PLAYERS_METADATA_PROPERTY;
-        const newStatus = botActive ? "bot" : "leaved";
-        console.log("NEW STATUS = ", newStatus);
-        jatos.groupSession
-            .set(key, newStatus)
-            .then(() => {
-                console.log(`Updated metadata for ${id}: ${newStatus}`);
-                console.log("Players status after changing:");
-                printAllPlayersStatus();
-            })
-            .catch(e => {
-                console.log("Error updating metadata", e);
-            });
-    }
-    else {
-        console.log("Not manager — skipping metadata update.");
-    }
-    console.log("jatos.groupSession.get(id+PLAYERS_METADATA_PROPERTY) = ",jatos.groupSession.get(id+PLAYERS_METADATA_PROPERTY));
-    await new Promise(resolve => setTimeout(resolve, 10000));
-}
 
 function getTakenAvatars() {
     const taken = [];
+    // Include avatars from human players
     jatos.groupMembers.forEach(memberId => {
         if (memberId !== jatos.groupMemberId) {
             const avatar = jatos.groupSession.get(memberId + AVATAR_EXTENSION);
             if (avatar) taken.push(avatar);
         }
+    });
+    // Include avatars from bots
+    const botIds = getBotPlayersIds();
+    botIds.forEach(botId => {
+        const avatar = jatos.groupSession.get(botId + AVATAR_EXTENSION);
+        if (avatar) taken.push(avatar);
+        const randomAvatar = jatos.groupSession.get(botId + RANDOM_AVATAR_EXTENSION);
+        if (randomAvatar) taken.push(randomAvatar);
     });
     return taken;
 }
@@ -576,12 +542,25 @@ function getMyGroupIndex() {
 }
 
 function getBaseAvatarPool() {
-    const num_players = jatos.groupMembers.length;
-    const num_avatars_per_player = Math.floor(AVATARS_LIST.length / num_players);
-    const myIndex = getMyGroupIndex();
-    if (myIndex === -1) return [];
+    // Trier groupMembers pour un ordre consistant entre tous les joueurs
+    const sortedMembers = [...jatos.groupMembers].sort();
+    const myIndex = sortedMembers.indexOf(jatos.groupMemberId);
+
+    // Fallback si non trouvé
+    if (myIndex === -1) return AVATARS_LIST.slice(0, 4);
+
+    // Utiliser le nombre de joueurs humains (groupMembers n'inclut pas les bots)
+    const numHumanPlayers = sortedMembers.length;
+
+    const MAX_AVATARS_PER_PLAYER = 4;
+    const num_avatars_per_player = Math.min(
+        Math.floor(AVATARS_LIST.length / numHumanPlayers),
+        MAX_AVATARS_PER_PLAYER
+    );
+
     const start = myIndex * num_avatars_per_player;
     const end = start + num_avatars_per_player;
+
     return AVATARS_LIST.slice(start, end);
 }
 
@@ -618,13 +597,10 @@ async function updateRandomAvatar(id){
 
 
 function getBotByPlayerId(playerId) {
-    console.log('#######################');
-    console.log("playerID = ",playerId);
     for (const [id, botInstance] of bots) {
-        console.log(id);
         if (id === playerId) return botInstance;
     }
-    return null; // si pas trouvé
+    return null;
 }
 
 function iAmManager(){

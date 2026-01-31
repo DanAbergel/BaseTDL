@@ -19,89 +19,617 @@
     <script src="jatos.js"></script>
     <script src="utils.js"></script>
     <script src="trials.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jstat@latest/dist/jstat.min.js"></script>
+    <script src="bot_funcs.js"></script>
+    <script src="bot.js"></script>
     <link rel="stylesheet" href="libs/pure-release-0.6.0/pure-min.css">
     <link rel="stylesheet" type="text/css" href="css/styles.css" />
+    <script id="Constants">
+        const jsPsych = initJsPsych() ;
+        let currentTurn = "";
+        let nextTurn = "";
+        let botActive = false;
+        let associationsPerBreak = 0;
+        let words_list = [];
+        let textInput_limit = 0;
+        let textStart_limit = 0;
+        let breakStates = []
+        let assocIndex = 0;
+        let enteredWord = "";
+        let bots = [];
+        let maxTrials = 120;
+
+    </script>
     <script id="Asynchronous Trials">
-        function getArrowForSide(side) {
-            switch (side) {
-                case "left":
-                    return "⇐";
-                case "right":
-                    return "⇒";
-                case "top":
-                    return "⇑";
-                default:
-                    return "";
-            }
+
+        /**
+         * Generates the Likert-scale questionnaire trials shown during breaks.
+         * Each question is displayed with the relevant player avatar and text prompt.
+         */
+        function getQuestionsTrial() {
+            let questions = [];
+            const ids = shuffle_seed(getAllPlayersIds(true));
+            const base = (text, id) =>
+                function () {
+                    const centerHtml =
+                        text +
+                        " <img src='" +
+                        getRandomAvatarById(id) +
+                        "' style='width: 50px; height: 50px;'>";
+
+                    return getScreen({
+                        center: [centerHtml],
+                        hideOthers: true
+                    });
+                };
+            questions.push(
+                createLikertTrial("To what extent do you identify with the following statement:<br><b>I enjoy the game so far</b>", "enjoy")
+            );
+            ids.forEach(id =>
+                questions.push(
+                    createLikertTrial(
+                        base("To what extent do you identify with the following statement:<br><b>I feel in-sync with</b>", id),
+                        "sync_" + id)
+                )
+            );
+            ids.forEach(id =>
+                questions.push(
+                    createLikertTrial(base("To what extent do you identify with the following statement:<br><b>So far, I like</b>", id),
+                        "like_" + id)
+                )
+            );
+            return questions;
         }
 
+        function buildScreenState({ sender, receiver, lastWord, mode }) {
+            const others = getAllOtherPlayersIds();
+            const n = others.length;
+
+            // Loading: only receiver is loading
+            const loading = others.map(id => id === receiver);
+
+            // Find the side of the receiver to point arrows correctly
+            const receiverIdx = others.indexOf(receiver);
+            const receiverSide = receiverIdx !== -1 ? getOtherPlayerLayout(receiverIdx, n).side : null;
+
+            const assocs = others.map((id, idx) => {
+                const { side } = getOtherPlayerLayout(idx, n);
+
+                if (mode === "loading") {
+                    if (id === receiver) return lastWord || "";
+                    // Sender's arrow should point toward the receiver
+                    if (id === sender && receiverSide) return getArrowForSide(receiverSide);
+                    return "";
+                }
+
+                if (mode === "pointing") {
+                    if (id === receiver) return `${lastWord || ""} ${getArrowForSide(side)}`;
+                    // Sender's arrow should point toward the receiver
+                    if (id === sender && receiverSide) return getArrowForSide(receiverSide);
+                    return "";
+                }
+
+                return "";
+            });
+
+            return { others, loading, assocs };
+        }
+
+        /*************************************************
+         * HELPERS — directions & clavier
+         *************************************************/
+
+        function getAvailableDirections(nOthers) {
+            if (nOthers === 1) return ["up"]
+            if (nOthers === 2) return ["left", "right"];
+            if (nOthers === 3) return ["left", "right", "up"];
+            throw new Error("Unsupported number of players");
+        }
+
+        // Source of truth: which keyboard key activates which directions (including corners)
+        const KEY_TO_DIRECTION = {
+            arrowleft:  ["left", "up_left", "bot_left"],
+            arrowright: ["right", "up_right", "bot_right"],
+            arrowup:    ["up"]
+        };
+
+        // Automatically derive DIRECTION_TO_KEY from KEY_TO_DIRECTION
+        const DIRECTION_TO_KEY = Object.entries(KEY_TO_DIRECTION)
+            .flatMap(([key, directions]) =>
+                directions.map(dir => [dir, key])
+            )
+            .reduce((acc, [dir, key]) => {
+                acc[dir] = key;
+                return acc;
+            }, {});
+
+        /*************************************************
+         * HELPERS — texte (HTML via getHtmlTag)
+         *************************************************/
+
+        function getChooseReceiverText(nOthers, { noResponse = false, autoWord = null, autoReceiverIdx = null } = {}) {
+            const lines = [];
+
+            if (!noResponse) {
+                lines.push(
+                    getHtmlTag(
+                        "div",
+                        "instruction_title",
+                        null,
+                        "<strong>Choose who will receive the word</strong>"
+                    )
+                );
+
+                lines.push(
+                    getHtmlTag(
+                        "div",
+                        "instruction_line",
+                        null,
+                        "Press <strong>←</strong> to send the word to the <strong>left player</strong>"
+                    )
+                );
+
+                lines.push(
+                    getHtmlTag(
+                        "div",
+                        "instruction_line",
+                        null,
+                        "Press <strong>→</strong> to send the word to the <strong>right player</strong>"
+                    )
+                );
+
+                if (nOthers === 3) {
+                    lines.push(
+                        getHtmlTag(
+                            "div",
+                            "instruction_line",
+                            null,
+                            "Press <strong>↑</strong> to send the word to the <strong>top player</strong>"
+                        )
+                    );
+                }
+            } else {
+                lines.push(
+                    getHtmlTag(
+                        "div",
+                        "instruction_title",
+                        null,
+                        "<strong>No response received</strong>"
+                    )
+                );
+
+                lines.push(
+                    getHtmlTag(
+                        "div",
+                        "instruction_line",
+                        null,
+                        "A word and a receiver were chosen automatically."
+                    )
+                );
+
+                lines.push(
+                    getHtmlTag(
+                        "div",
+                        "instruction_line",
+                        null,
+                        `<strong>Word:</strong> ${autoWord}`
+                    )
+                );
+
+                lines.push(
+                    getHtmlTag(
+                        "div",
+                        "instruction_line",
+                        null,
+                        `<strong>Receiver:</strong> Player ${autoReceiverIdx + 1}`
+                    )
+                );
+            }
+
+            return getHtmlTag(
+                "div",
+                "instruction",
+                "instruction",
+                lines
+            );
+        }
+
+
+        function getUpdateWordTrial() {
+            return {
+                type: jsPsychCallFunction,
+                async: true,
+                func: async (done) => {
+                    try {
+                        await addWord(jatos.groupMemberId, nextTurn, enteredWord);
+                    }
+                    catch (error) {
+                        console.error("❌ Error in getUpdateTrial:", error);
+                    } finally {
+                        done();
+                    }
+                }
+            };
+        }
+
+        /**
+         * Resolve the next receiver based on keyboard response and layout
+         */
+        function resolveNextTurnFromResponse(responseKey, others) {
+            const direction = KEY_TO_DIRECTION[responseKey];
+            const n = others.length;
+
+            const resolved = others
+                .map((id, idx) => ({
+                    id,
+                    ...getOtherPlayerLayout(idx, n)
+                }))
+                .find(p => direction.includes(p.side))?.id;
+
+            if (!resolved) {
+                throw new Error("Could not resolve next_turn from direction");
+            }
+
+            return resolved;
+        }
+
+        function buildTrivialCommitPayload() {
+            const others = getAllOtherPlayersIds();
+
+            if (others.length !== 1) {
+                throw new Error("buildTrivialCommitPayload called with wrong number of players");
+            }
+
+            let word;
+            let answered;
+
+            if (enteredWord === NO_RESPONSE) {
+                // Auto-pick a word
+                word = words_list[Math.floor(Math.random() * words_list.length)];
+                enteredWord = word; // keep global state consistent
+                answered = false;
+            } else {
+                word = enteredWord;
+                answered = true;
+            }
+
+            return {
+                previousTurn: jatos.groupMemberId,
+                nextTurn: others[0],
+                word,
+                answered
+            };
+        }
+
+
+        /**
+         * Commit the word exchange to group state
+         */
+        function commitWordExchange({ previousTurn, nextTurn, word, answered }) {
+            return addWord(
+                previousTurn,
+                nextTurn,
+                word,
+                answered ? "Answered" : "Not Answered"
+            );
+        }
+
+        /**
+         * jsPsych trial that commits the word exchange to group state
+         */
+        function getCommitWordExchangeTrial(payload) {
+            // Accept a function returning the payload, or the payload directly.
+            return {
+                type: jsPsychCallFunction,
+                async: true,
+                func: async (done) => {
+                    try {
+                        // If payload is a function, call it to get the actual payload.
+                        const p = typeof payload === "function" ? payload() : payload;
+
+                        await commitWordExchange({
+                            previousTurn: p.previousTurn,
+                            nextTurn: p.nextTurn,
+                            word: p.word,
+                            answered: p.answered
+                        });
+                    } catch (error) {
+                        console.error("❌ Error in getCommitWordExchangeTrial:", error);
+                    } finally {
+                        done();
+                    }
+                }
+            };
+        }
+        // Global payload for commitWordExchange
+        let commitPayload = null;
+
+
+
+function getChooseReceiverTrial() {
+    let wordEntered = false;
+
+    return {
+        type: jsPsychHtmlKeyboardResponse,
+
+        stimulus: function () {
+            const others = getAllOtherPlayersIds();
+            const n = others.length;
+
+            let center;
+
+            if (enteredWord !== NO_RESPONSE) {
+                wordEntered = true;
+                center = getChooseReceiverText(n);
+            } else {
+                // Auto-pick receiver
+                nextTurn = others[Math.floor(Math.random() * others.length)];
+                // Auto-pick word
+                enteredWord = words_list[Math.floor(Math.random() * words_list.length)];
+
+                center = getChooseReceiverText(n, {
+                    noResponse: true,
+                    autoWord: enteredWord,
+                    autoReceiverIdx: others.indexOf(nextTurn)
+                });
+            }
+
+            return getScreen({
+                center,
+                hideOthers: false,
+                others,
+                loading: others.map(() => false),
+                assocs: others.map(() => "")
+            });
+        },
+
+        choices: function () {
+            if (enteredWord === NO_RESPONSE) {
+                return "NO_KEYS";
+            }
+
+            const others = getAllOtherPlayersIds();
+            return getAvailableDirections(others.length)
+                .map(dir => DIRECTION_TO_KEY[dir]);
+        },
+
+        trial_duration: function () {
+            return wordEntered ? null : 4000;
+        },
+
+        on_finish: function (data) {
+            const previousTurn = jatos.groupMemberId;
+
+            if (wordEntered) {
+                const others = getAllOtherPlayersIds();
+                nextTurn = resolveNextTurnFromResponse(data.response, others);
+            }
+
+            commitPayload = {
+                previousTurn,
+                nextTurn,
+                word: enteredWord,
+                answered: wordEntered
+            };
+        }
+    };
+}
+
+
+        /**
+         * Assignment phase:
+         * - Shows the new word in the center
+         * - Displays an arrow pointing to the next (receiver) player
+         * - No loading indicators
+         */
+        function getSendConfirmationTrial() {
+            return {
+                type: jsPsychHtmlKeyboardResponse,
+                stimulus: function () {
+                    const { arrow } = getSideAndArrowForNextPlayer(nextTurn);
+                    const center = getHtmlTag(
+                        "div",
+                        "stimuli_word sent-word",
+                        "stimuli_word",
+                        `<div style="text-align: center;">
+                         <div style="font-size: 1.4em; margin-bottom: 4px; font-family: monospace; display: inline-block; width: 1.5em; text-align: center;">${arrow}</div>
+                         <div>${enteredWord}</div>
+                         </div>`
+                    );
+
+                    const others = getAllOtherPlayersIds();
+                    const n = others.length;
+
+                    const loading = others.map(() => false);
+                    return getScreen({ center, others, loading,hideOthers: false,});
+                },
+                choices: "NO_KEYS",
+                trial_duration: 4000,
+                on_finish: function (data) {
+                    enteredWord = NO_RESPONSE;
+                }
+            };
+        }
+
+        /**
+         * Waiting / loading phase:
+         * - Current receiver is shown as loading
+         * - Sender shows an arrow
+         * - Receiver shows the last word
+         * - Trial ends automatically when the turn changes
+         */
         function getLoadingTrial() {
             return {
                 type: jsPsychHtmlKeyboardResponse,
                 stimulus: function () {
                     const sender = getSender();
-                    const currentTurn = getReceiver();
+                    const receiver = getReceiver();
                     const lastWord = getLastWord();
 
-                    const others = getAllPlayersIds(true);
-                    const n = others.length;
-
-                    // Only the current turn player is loading
-                    const loading = others.map(id => id === currentTurn);
-                    const assocs = others.map((id, idx) => {
-                        const layout = getOtherPlayerLayout(idx, n);
-
-                        // Active player → show last word
-                        if (id === currentTurn) {
-                            return lastWord || "";
-                        }
-                        // Sender → show arrow based on position
-                        if (id === sender) {
-                            return getArrowForSide(layout.side);
-                        }
-                        return "";
+                    const { others, loading, assocs } = buildScreenState({
+                        sender,
+                        receiver,
+                        lastWord,
+                        mode: "loading"
                     });
 
                     return getScreen({
                         center: [],
-                        hideOthers: false,
                         others,
                         loading,
-                        assocs
+                        assocs,
+                        hideOthers: false,
                     });
                 },
                 choices: "NO_KEYS",
                 on_load: function () {
                     const currentTurn = getReceiver();
+                    console.log("[LOADING] Started, receiver:", currentTurn, "botIds:", getBotPlayersIds());
 
                     const checkInterval = setInterval(function () {
                         const receiver = getReceiver();
-                        if (receiver !== currentTurn || receiver === jatos.groupMemberId || checkBreak() == true) {
+                        if (
+                            receiver !== currentTurn ||
+                            receiver === jatos.groupMemberId ||
+                            checkBreak() === true
+                        ) {
                             clearInterval(checkInterval);
                             jsPsych.finishTrial();
                         }
-                        if (iAmManager() && isLeaver(currentTurn)) {
-                            setTimeout(() => {
-                                getBotCheckTrial();
-                            }, 4000);
+                        // Check if bot should respond (for initial bots or leaved players)
+                        if (iAmManager() && (getBotPlayersIds().includes(receiver) || getLeavedPlayersIds().includes(receiver)) && !botProcessing) {
+                            getBotCheckTrial();
                         }
-                    }, 10); // Check every 100 milisecond
+                    }, 10);
                 },
                 on_finish: function (data) {
-                    const group_data = getGroupData();
-                    const lastWord = getLastWord();
-                    const currentTurn = getReceiver();
-                    const sender = getSender();
-                    data.trialIndex = group_data.length;
-                    data.entered_word = lastWord;
-                    data.current_turn = sender;
-                    data.next_turn = currentTurn;
-                    data.block = block;
+                    data.trialIndex = getGroupData().length;
+                    data.entered_word = getLastWord();
+                    data.current_turn = getSender();
+                    data.next_turn = getReceiver();
                 }
+            };
+        }
+
+
+        /**
+         * Pointing phase:
+         * - Shows the last word near the receiver
+         * - Displays arrows indicating the flow from sender to receiver
+         * - No automatic loading spinner
+         */
+        function getWaitingPointingTrial() {
+            return {
+                type: jsPsychHtmlKeyboardResponse,
+                stimulus: function () {
+                    const sender = getSender();
+                    const receiver = getReceiver();
+                    const lastWord = getLastWord();
+
+                    const { others, loading, assocs } = buildScreenState({
+                        sender,
+                        receiver,
+                        lastWord,
+                        mode: "pointing"
+                    });
+
+                    return getScreen({
+                        center: [],
+                        others,
+                        loading,
+                        assocs,
+                        hideOthers: false
+                    });
+                },
+                choices: "NO_KEYS",
+                trial_duration: 1000
+            };
+        }
+
+        /*******************************************************
+         * Bot Response Handler
+         * When it's a bot's turn, generate a real association
+         * using the SMP model from bot_funcs.js
+         *******************************************************/
+        let botProcessing = false;
+
+        function getBotCheckTrial() {
+            const botId = getReceiver();
+
+            if (!(getBotPlayersIds().includes(botId) || getLeavedPlayersIds().includes(botId)) || !iAmManager()) {
+                return;
+            }
+
+            const stimulus = getLastWord();
+
+            if (!stimulus) {
+                return;
+            }
+
+            if (botProcessing) {
+                return;
+            }
+
+            botProcessing = true;
+
+            const bot = getBotByPlayerId(botId);
+            if (!bot) {
+                botProcessing = false;
+                return;
+            }
+
+            try {
+                const { association, rt, debugInfo } = bot.getAssocWord(stimulus);
+                const candidates = [...getPresentPlayersIds(), ...getBotPlayersIds()].filter(id => id !== botId);
+                if (candidates.length === 0) {
+                    botProcessing = false;
+                    return;
+                }
+                const nextPlayer = candidates[Math.floor(Math.random() * candidates.length)];
+
+                // Log bot reasoning
+                console.group(`[BOT] "${stimulus}" → "${association}" (${Math.round(rt)}ms) → ${nextPlayer}`);
+                console.log(`  Cue in dictionary: ${debugInfo.cueInDictionary}`);
+                console.log(`  Source: ${debugInfo.finalCueSource}`);
+                if (debugInfo.finalUsedCue !== stimulus.toLowerCase()) {
+                    console.log(`  Used cue instead: "${debugInfo.finalUsedCue}"`);
+                }
+                console.log(`  Iterations: ${debugInfo.iterations}`);
+                if (debugInfo.track_assoc.length > 1) {
+                    console.log(`  Rejected associations: ${debugInfo.track_assoc.slice(0, -1).join(', ')}`);
+                }
+                console.groupEnd();
+
+                // Wait for the simulated response time before sending
+                setTimeout(() => {
+                    addWord(botId, nextPlayer, association)
+                        .then(() => {
+                            botProcessing = false;
+                        })
+                        .catch(err => {
+                            console.error("[BOT ERROR]", err);
+                            botProcessing = false;
+                        });
+                }, rt);
+            } catch (error) {
+                console.error("[BOT ERROR]", error);
+                botProcessing = false;
             }
         }
+
     </script>
     <script id="Helpers">
+        async function addWord(group_member_id, next_member_id, word) {
+            let group_data = getGroupData();
+            group_data.push([group_member_id, next_member_id, word]);
+            let pairs = jatos.groupSession.get(PAIRS_PROPERTY) || [];
+            pairs.push([enteredWord, word, group_member_id, getSender()]);
+            let properties = jatos.groupSession.getAll();
+            properties[PAIRS_PROPERTY] = pairs;
+            properties[GROUP_DATA] = group_data;
+            await jatos.groupSession.setAll(properties);
+        }
+
         /*******************************************************
          * CHECK BLOCK BREAK BY COUNT
          * -----------------------------------------------------
@@ -111,38 +639,226 @@
          *  - Last sender did not leave
          *******************************************************/
         function checkBreak() {
-            return getGDLength() > 0 && getGDLength() % trials_number === 0 && !isLeaver(getSender());
+            // Trigger break when number of associations is a multiple of associationsPerBreak
+            return getGroupData().length % associationsPerBreak === 0 && getGroupData().length > 0;
+        }
+
+        function ItsMyTurn() {
+            return getReceiver() === jatos.groupMemberId;
+        }
+
+        function getArrowForSide(side) {
+            switch (side) {
+                case "left":
+                    return "⇐";
+                case "right":
+                    return "⇒";
+                case "up":
+                    return "⇑";
+                case "bot":
+                    return "⇓";
+
+                // Diagonal positions use horizontal arrows
+                case "up_left":
+                    return "⇐";
+                case "up_right":
+                    return "⇒";
+                case "bot_left":
+                    return "↙";
+                case "bot_right":
+                    return "↘";
+
+                default:
+                    return "";
+            }
+        }
+
+        /**
+         * Helper: get side + arrow for the next player
+         *
+         * @param {string} nextPlayerId - ID of the next (receiver) player
+         * @returns {{ side: string, arrow: string }}
+         */
+        function getSideAndArrowForNextPlayer(nextPlayerId) {
+            const others = getAllOtherPlayersIds();
+            const n = others.length;
+
+            const idx = others.indexOf(nextPlayerId);
+            if (idx === -1) {
+                throw new Error("Next player not found among other players");
+            }
+
+            const { side } = getOtherPlayerLayout(idx, n);
+            const arrow = getArrowForSide(side);
+
+            return { side, arrow };
+        }
+
+        function getSender(){
+            const gd = getGroupData();
+            return gd.length > 0 ? gd[gd.length - 1][0] : null;
+        }
+
+        function getReceiver(){
+            const gd = getGroupData();
+            return gd.length > 0 ? gd[gd.length - 1][1] : null;
+        }
+
+        function getLastWord(){
+            const gd = getGroupData();
+            return gd.length > 0 ? gd[gd.length - 1][2] : null
         }
     </script>
     <script id="Wrappers">
-        function getConditionalCountdownTrial(word){
-            const condition = () =>{
-                turn === jatos.groupMemberId ||
-                (getBotPlayersIds().includes(turn) && iAmManager())
-            };
+        function playCondition(){
+            const current_turn = getReceiver();
+            // Only return true if it's MY turn (not a bot's turn)
+            return current_turn === jatos.groupMemberId;
+        }
+
+        function getConditionalLoopingLoadingTrial(){
+            return makeConditionalLoopingTrial(
+                ()=>{return !playCondition()},
+                [getLoadingTrial()]
+            );
+        }
+
+        // Helper to check if there is more than one other player
+        function hasMoreThanOneOtherPlayer() {
+            return getAllOtherPlayersIds().length > 1;
+        }
+
+        function getConditionalPlayingTrials() {
             return makeConditionalTrial(
-                condition,
-                [getCountdownTrial(word)]
+                () => playCondition() && numPlayersFinishParam(COMPLETE_BREAK_EXTENTION, "entered") === 0,
+                [
+                    getCountdownTrial(getLastWord),
+                    getWordExchangeTrial(getLastWord),
+
+                    // Only choose receiver if more than one other player exists
+                    makeConditionalTrial(
+                        () => hasMoreThanOneOtherPlayer(),
+                        [
+                            getChooseReceiverTrial()
+                        ]
+                    ),
+
+                    // CASE: only one other player → payload is deterministic
+                    makeConditionalTrial(
+                        () => !hasMoreThanOneOtherPlayer(),
+                        [
+                            {
+                                type: jsPsychCallFunction,
+                                func: () => {
+                                    commitPayload = buildTrivialCommitPayload();
+                                }
+                            }
+                        ]
+                    ),
+
+                    // Commit must always happen
+                    getCommitWordExchangeTrial(() => commitPayload),
+
+                    // Show confirmation only if receiver choice was meaningful
+                    makeConditionalTrial(
+                        () => hasMoreThanOneOtherPlayer(),
+                        [
+                            getSendConfirmationTrial()
+                        ]
+                    )
+                ]
+            );
+        }
+
+        function getLoadingCondition(){
+            return !playCondition() &&
+                numPlayersFinishParam(COMPLETE_BREAK_EXTENTION,"entered") === 0 ;
+        }
+
+        function getConditionalLoadingTrials(){
+            return makeConditionalTrial(
+                getLoadingCondition,
+               [
+                   makeConditionalLoopingTrial(getLoadingCondition, [getLoadingTrial()]),
+                   getWaitingPointingTrial()
+               ]
             )
         }
 
     </script>
     <script id="Experiment">
-        function onOpen(){
-            initializeSessionVariables();
+        async function initializeSessionVariables() {
+            // Wait for bot data to be loaded
+            await botDataReady;
+            // Load configuration data from JATOS, using batch-level settings by default, falling back to empty object if none provided
+            const cfg_batch = jatos.batchJsonInput || {};
+            const cfg_study = jatos.studyJsonInput || {};
+            // Enable or disable detailed logging in the console (default: false)
+            showLog = cfg_batch.showLog || cfg_study.showLog || false;
+            associationsPerBreak = cfg_batch.associationsPerBreak || cfg_study.associationsPerBreak || 10;
+            // Whether a bot should answer for absent players (default: false)
+            botActive = cfg_batch.botActive || cfg_study.botActive || false;
+            // Duration of the break between blocks (default: 15 seconds)
+            break_duration = cfg_batch.break_duration || cfg_study.break_duration || 15 * 1000
+            words_list = jatos.groupSession.get(MAIN_WORDS_PROPERTY);
+            textInput_limit = jatos.batchJsonInput.textInput_limit || jatos.studyJsonInput.textInput_limit || 10
+            textStart_limit = jatos.batchJsonInput.textStart_limit || jatos.studyJsonInput.textStart_limit || 1.5
+            maxTrials = cfg_study.maxTrials || cfg_batch.maxTrials || 120;
+            for(const id of getAllPlayersIds()) {
+                bots.push([id,new Bot(id)]);
+            }
+            // ==========================================================
+            // Structured debug logs
+            // ==========================================================
+            if (showLog) {
+                console.groupCollapsed("%c[INITIALIZATION SUMMARY]", "color: #2e86de; font-weight: bold;");
+                console.table({
+                    "AssociationsPerBreak": associationsPerBreak,
+                    "Break duration": break_duration,
+                    "Bot active": botActive,
+                    "Words list": words_list ? words_list.join(", ") : "None",
+                });
+                console.groupEnd();
+            }
+        }
+
+        function InitializeFirstAssoc(){
+            return {
+                type: jsPsychCallFunction,
+                func: function () {
+                    const group_data = getGroupData();
+                    // If this is the first player to start the block, add the seed word and define the first turn.
+                    if (group_data.length === 0) {
+                        const randomTurn = getAllPlayersIds()[Math.floor(Math.random() * getAllPlayersIds().length)];
+                        addWord("START", randomTurn, words_list[0])
+                            .catch((e) => {
+                                console.error("Error initializing block; Trying again, error:" + e);
+                            });
+                    }
+                }
+            };
+        }
+
+        function updateAssociationState(word) {
+            return {
+                type: jsPsychCallFunction,
+                func: () => {
+                    assocIndex += 1;
+                }
+            }
+        }
+
+        async function onOpen(){
+            await initializeSessionVariables();
             let timeline = [];
             // timeline.push(...manageFullScreenTrial());
-            words_list.forEach(word => {
-                timeline.push(updateAssociationState(word));
-                timeline.push(getConditionalCountdownTrial(word));
-                timeline.push();
-                timeline.push(getWordExchangeTrial(word));
-                timeline.push(updateGD_trial(word));
-                timeline.push(updateGD_leavedPlayers(word));
-                timeline.push(syncPlayers(word));
-                timeline.push(getDisplayAnswersTrial(word));
-                timeline.push(break_condition());
-            });
+            for (let i = 1; i < maxTrials; i++) {
+                timeline.push(updateAssociationState());
+                timeline.push(InitializeFirstAssoc());
+                timeline.push(getConditionalPlayingTrials());
+                timeline.push(getConditionalLoadingTrials());
+                timeline.push(break_condition(true));
+            }
 
             jsPsych.run(timeline);
 
@@ -157,9 +873,7 @@
         function onClose(){}
         function onMemberOpen(id){}
         function onMemberClose(id){}
-        function onMemberLeave(id){
-            updatePlayersMetadata(id);
-        }
+        function onMemberLeave(id){}
         function onGroupSession(path,op){}
         function printError(message){}
 
@@ -176,31 +890,6 @@
                 });
             });
     </script>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
   </head>

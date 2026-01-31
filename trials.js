@@ -8,7 +8,8 @@ const makeConditionalLoopingTrial = (conditionFn, timeline) => (
 );
 
 // Function to get the update trial
-function updateGroupSessionTrial(keys_values, maxRetries = 8) {
+function
+updateGroupSessionTrial(keys_values, maxRetries = 8) {
     return {
         type: jsPsychCallFunction,
         async: true,
@@ -220,7 +221,7 @@ function saveCountdownData(data) {
 }
 
 
-function getCountdownTrial(word ,time= 15) {
+function getCountdownTrial(word_assoc ,time= 15) {
     /*******************************************************
      * COUNTDOWN TRIAL
      * -----------------------------------------------------
@@ -239,8 +240,8 @@ function getCountdownTrial(word ,time= 15) {
         choices: [' '], // Spacebar
         trial_duration: time * 1000,
         stimulus: () => {
+            const word = (typeof word_assoc === "function") ? word_assoc() : word_assoc;
             const [stimulus_word_html, timer_html] = createStimulusHTML(word, true);
-
             return getScreen({
                 center: [timer_html, stimulus_word_html],
                 hideOthers: false,
@@ -265,7 +266,7 @@ function getCountdownTrial(word ,time= 15) {
 }
 
 
-function getTextInputTrial(word,countdown = false) {
+function getTextInputTrial(word_assoc,countdown = false) {
     let startTimer;
     let keysPressed = [];
     let keystroke_rt = [];
@@ -283,6 +284,7 @@ function getTextInputTrial(word,countdown = false) {
         choices: ['enter'],
         trial_duration: textInput_limit * 1000,
         stimulus: () => {
+            const word = (typeof word_assoc === "function") ? word_assoc() : word_assoc;
             const [stimuli_html, timer_html] = createStimulusHTML(word, countdown);
             const input_html = getHtmlTag(
                 "input",
@@ -291,7 +293,6 @@ function getTextInputTrial(word,countdown = false) {
                 null,
                 { type: "text", autocomplete: "off" }
             );
-
             return getScreen({
                 center: [stimuli_html, timer_html, input_html],
                 hideOthers: false,
@@ -311,7 +312,6 @@ function getTextInputTrial(word,countdown = false) {
             jsPsych.pluginAPI.clearAllTimeouts();
             if (!enteredWord) {
                 enteredWord = NO_RESPONSE;
-                console.log("in trials !!! entered word = ",enteredWord);
                 error_strike++;
                 validateErrors();
             }
@@ -352,23 +352,6 @@ function getErrorTrial(){
     };
 }
 
-function getUpdateWordTrial() {
-    return {
-        type: jsPsychCallFunction,
-        async: true,
-        func: async (done) => {
-            try {
-                await addWord(jatos.groupMemberId, nextTurn, enteredWord);
-            }
-            catch (error) {
-                console.error("❌ Error in getUpdateTrial:", error);
-            } finally {
-                done();
-            }
-        }
-    };
-}
-
 function getSlowErrorTrial(){
     return {
         type: jsPsychHtmlKeyboardResponse,
@@ -394,109 +377,15 @@ function getSlowErrorTrial(){
 }
 
 
-
-function getChooseReceiverTrial(){
-    return {
-        type: jsPsychHtmlKeyboardResponse,
-        choices: ['ArrowLeft', 'ArrowRight'],
-        stimulus: function () {
-            const otherPlayers = getAllOtherPlayersIds();
-            const leftPlayer = otherPlayers[0];
-            const rightPlayer = otherPlayers[1];
-
-            const instruction = getHtmlTag(
-                "div",
-                "instruction",
-                "instruction",
-                "Choose the next player to receive the word:"
-            );
-
-            const leftChoice = getHtmlTag(
-                "div",
-                "choice_left",
-                "choice_left",
-                `← Left (Player ${allPlayers.indexOf(leftPlayer) + 1})`
-            );
-
-            const rightChoice = getHtmlTag(
-                "div",
-                "choice_right",
-                "choice_right",
-                `(Player ${allPlayers.indexOf(rightPlayer) + 1}) Right →`
-            );
-
-            return getScreen({
-                center: [instruction, leftChoice, rightChoice],
-                hideOthers: false,
-                others: otherPlayers,
-                loading: otherPlayers.map(() => false),
-                assocs: []
-            });
-        },
-        trial_duration: 15000,
-        on_finish: function (data) {
-            const otherPlayers = getAllOtherPlayersIds();
-
-            // Check if the player responded
-            if (data.response == null) {  // No response within 10 seconds
-                nextTurn = otherPlayers[Math.floor(Math.random() * 2)];  // Random choice
-                data.chose_reciever = false; // Mark that the player didn't respond
-            } else {
-                nextTurn = data.response.toLowerCase() === 'arrowleft' ? otherPlayers[0] : otherPlayers[1];
-                data.chose_reciever = true; // Mark that the player responded
-            }
-
-            data.current_turn = jatos.studyResultId;
-            data.next_turn = nextTurn;
-            let group_data = getGroupData();
-            data.trialIndex = group_data.length;
-            data.block = block;
-        }
-    };
-}
-
-function getReceiverErrorTrial(){
-    return {
-        type: jsPsychHtmlKeyboardResponse,
-        stimulus: function () {
-            const error_html = getHtmlTag(
-                "div",
-                "error",
-                "error",
-                "You must choose a player to send the word to."
-            );
-
-            return getScreen({
-                center: error_html,
-                hideOthers: false,
-                others: getAllOtherPlayersIds(),
-                loading: getAllOtherPlayersIds().map(() => false),
-                assocs: []
-            });
-        },
-        choices: "NO_KEYS",
-        trial_duration: 3000, // 3 seconds warning
-        on_finish: function (data) {
-            // Randomly assign a player after the warning
-            const otherPlayers = getAllOtherPlayersIds();
-            nextTurn = otherPlayers[Math.floor(Math.random() * 2)];
-            data.next_turn = nextTurn;
-            let data1 = jsPsych.data.get().last(2).values()[0];
-            data.chose_reciever = data1.chose_reciever;
-        }
-    }
-}
-
-
 // Function to get the text input trial
 // The participant can enter a word and press enter
 // If the participant does not enter a word, a message is displayed for 3 seconds
-function getWordExchangeTrial(word) {
+function getWordExchangeTrial(word_assoc) {
     /**
      * Returns the conditional trial objects for the word exchange phase.
      * Uses concise helpers for clarity and avoids duplicated logic.
      */
-    const text_input_trial = getTextInputTrial(word);
+    const text_input_trial = getTextInputTrial(word_assoc);
     const slow_error_condition = makeConditionalTrial(()=>{
         let data = jsPsych.data.get().last(1).values()[0];
         return data.slow;
@@ -507,7 +396,13 @@ function getWordExchangeTrial(word) {
     return makeConditionalTrial(
         () => {
                 let data = jsPsych.data.get().last(1).values()[0];
-                return data.rt !== null;
+                if(data.rt !== null){
+                    return true;
+                }
+                else{
+                    enteredWord = NO_RESPONSE;
+                    return false;
+                }
             }, [text_input_trial,slow_error_condition]
     );
 }

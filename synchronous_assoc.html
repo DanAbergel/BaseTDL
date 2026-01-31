@@ -18,6 +18,8 @@
     <script src="jatos.js"></script>
     <script src="utils.js"></script>
     <script src="trials.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jstat@latest/dist/jstat.min.js"></script>
+    <script src="bot_funcs.js"></script>
     <script src="bot.js"></script>
     <link rel="stylesheet" href="libs/pure-release-0.6.0/pure-min.css">
     <link rel="stylesheet" type="text/css" href="css/styles.css" />
@@ -168,7 +170,9 @@
     </script>
 
     <script id="Helpers">
-        function initializeSessionVariables() {
+        async function initializeSessionVariables() {
+            // Wait for bot data to be loaded
+            await botDataReady;
             // Load configuration data from JATOS, using batch-level settings by default, falling back to empty object if none provided
             const cfg_batch = jatos.batchJsonInput || {};
             const cfg_study = jatos.studyJsonInput || {};
@@ -180,13 +184,17 @@
             console.log("botActive", botActive);
             // Duration of the break between blocks (default: 15 seconds)
             break_duration = cfg_batch.break_duration || cfg_study.break_duration || 15 * 1000
-            words_list = shuffle_seed( cfg_batch.words_list || cfg_study.words_list || [] );
+            console.log(MAIN_WORDS_PROPERTY,jatos.groupSession.getAll());
+            words_list = jatos.groupSession.get(MAIN_WORDS_PROPERTY);
+            console.log("words list = ",words_list);
             textInput_limit = jatos.batchJsonInput.textInput_limit || jatos.studyJsonInput.textInput_limit || 10
             textStart_limit = jatos.batchJsonInput.textStart_limit || jatos.studyJsonInput.textStart_limit || 1.5
             for(const id of getAllPlayersIds()) {
-                bots.push([id,new SeriousBot(id)]);
+                bots.push([id,new Bot(id)]);
             }
-            console.log("Leaved players replaced by a bot are , ",getPlayersIdsByStatus('bot'));
+            console.log("[BOT SYSTEM] Bot players (created at start or replacing leaved): ", getBotPlayersIds());
+            console.log("[BOT SYSTEM] Total players: ", getAllPlayersIds());
+            console.log("[BOT SYSTEM] Present human players: ", getPresentPlayersIds());
             // ==========================================================
             // Structured debug logs
             // ==========================================================
@@ -222,27 +230,67 @@
             );
         }
 
+        // Handles bot responses - both bots created at initialization and bots replacing leaved players
         function updateGD_leavedPlayers(word) {
             let updateBots_trial =  {
                 type:jsPsychCallFunction,
                 func: () => {
                     let key_values = [];
-                    const botsPlayers = getPlayersIdsByStatus('bot');
-                    for (let i=0; i<botsPlayers.length; i++) {
+                    const botsPlayers = [...getBotPlayersIds(), ...getLeavedPlayersIds()];
+
+                    console.log(`[BOT SYSTEM] Processing ${botsPlayers.length} bot(s) for word: "${word}"`);
+
+                    if (botsPlayers.length === 0) {
+                        console.log("[BOT SYSTEM] No bots to process");
+                        return;
+                    }
+
+                    for (let i = 0; i < botsPlayers.length; i++) {
                         const player = botsPlayers[i];
                         const key = player + "_" + word;
-                        const value = getBotByPlayerId(player).getAssocWord(word);
-                        key_values.push([key,value]);
+
+                        // Get bot instance
+                        const bot = getBotByPlayerId(player);
+                        if (!bot) {
+                            console.error(`[BOT SYSTEM] Bot instance not found for player: ${player}`);
+                            continue;
+                        }
+
+                        // Get bot response with new format { association, rt, debugInfo }
+                        const botResponse = bot.getAssocWord(word);
+                        const { association, rt, debugInfo } = botResponse;
+
+                        // Log bot reasoning
+                        console.log(`[BOT ${player}] =====================`);
+                        console.log(`[BOT ${player}] Cue: "${word}"`);
+                        console.log(`[BOT ${player}] Response: "${association}" (RT: ${rt}ms)`);
+                        if (debugInfo) {
+                            console.log(`[BOT ${player}] Cue in dictionary: ${debugInfo.cueInDictionary}`);
+                            console.log(`[BOT ${player}] Source: ${debugInfo.finalCueSource}`);
+                            if (debugInfo.finalUsedCue !== word.toLowerCase()) {
+                                console.log(`[BOT ${player}] Used cue instead: "${debugInfo.finalUsedCue}"`);
+                            }
+                            console.log(`[BOT ${player}] Iterations: ${debugInfo.iterations}`);
+                            if (debugInfo.track_assoc && debugInfo.track_assoc.length > 1) {
+                                console.log(`[BOT ${player}] Rejected associations: ${debugInfo.track_assoc.slice(0, -1).join(', ')}`);
+                            }
+                        }
+
+                        key_values.push([key, association]);
                     }
-                    updateGroupSessionRobust(key_values);
+
+                    if (key_values.length > 0) {
+                        console.log(`[BOT SYSTEM] Storing ${key_values.length} bot response(s)`);
+                        updateGroupSessionRobust(key_values);
+                    }
                 }
             }
-            return makeConditionalTrial(iAmManager,[updateBots_trial]);
+            return makeConditionalTrial(iAmManager, [updateBots_trial]);
         }
     </script>
     <script id="Experiment">
-        function onOpen(){
-            initializeSessionVariables();
+        async function onOpen(){
+            await initializeSessionVariables();
             let timeline = [];
             // timeline.push(...manageFullScreenTrial());
             words_list.forEach(word => {
@@ -269,9 +317,7 @@
         function onClose(){}
         function onMemberOpen(id){}
         function onMemberClose(id){}
-        function onMemberLeave(id){
-            updatePlayersMetadata(id);
-        }
+        function onMemberLeave(id){}
         function onGroupSession(path,op){}
         function printError(message){}
 

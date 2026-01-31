@@ -82,7 +82,6 @@
 
 
         async function onMemberLeave(id) {
-            updatePlayersMetadata(id);
             updateRandomAvatar(id);
         }
 
@@ -126,9 +125,6 @@
 
 
         function onOpen() {
-            console.log("TRAINING!!!");
-            console.log(jatos.groupSession.get(PLAYERS_METADATA_PROPERTY));
-
             initializeSessionVariables();
 
             let timeline = [];

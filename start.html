@@ -39,6 +39,55 @@
             jsPsych.finishTrial();
         }
 
+
+        function initializePlayersMetadata(properties) {
+            console.log("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+            const cfg_batch = jatos.batchJsonInput || {};
+            const cfg_study = jatos.studyJsonInput || {};
+
+            const expectedTotalPlayers =
+                cfg_batch.expectedTotalPlayers ||
+                cfg_study.expectedTotalPlayers ||
+                null;
+
+            // 1. all humans connected at the beginning are PRESENT
+            const realPlayers = jatos.groupMembers || [];
+            properties[HUMAN_PLAYERS_PROPERTY] = realPlayers;
+
+            // 2. init bots for get expectedTotalPlayers
+            if (expectedTotalPlayers !== null) {
+                const botsNeeded = Math.max(
+                    0,
+                    expectedTotalPlayers - realPlayers.length
+                );
+
+                // Generate random position prefix based on group composition (same for all players)
+                const groupSeed = realPlayers.sort().join('').split('').reduce((a, b) => a + b.charCodeAt(0), 0);
+
+                properties[BOT_PLAYERS_PROPERTY] = []
+                for (let i = 0; i < botsNeeded; i++) {
+                    // Create bot ID with random-looking number to vary position among players
+                    const botPosition = ((groupSeed + i * 1337) % 9000) + 1000;
+                    const botId = `${botPosition}_BOT_${i + 1}`;
+                    properties[BOT_PLAYERS_PROPERTY].push(botId);
+                    // Assign different avatars for avatar and random_avatar
+                    // Use avatars from the end of the list to avoid conflicts with human players
+                    const avatarIndex = AVATARS_LIST.length - 1 - (i * 2);
+                    const randomAvatarIndex = AVATARS_LIST.length - 2 - (i * 2);
+                    properties[botId + AVATAR_EXTENSION] = AVATARS_LIST[avatarIndex];
+                    properties[botId + RANDOM_AVATAR_EXTENSION] = AVATARS_LIST[randomAvatarIndex];
+                }
+
+                console.log(
+                    "[GROUP INIT]",
+                    "\npresent humans =", properties[HUMAN_PLAYERS_PROPERTY],
+                    "\nbots = ",properties[BOT_PLAYERS_PROPERTY],
+                    "\nexpectedTotalPlayers =", expectedTotalPlayers,
+                    "\nbotsInitialized =", botsNeeded
+                );
+            }
+        }
+
     </script>
 
     <script id="Trials">
@@ -94,37 +143,33 @@
 
 
         // Function to initialize all global variables shared across modules
-        function initializeGlobalVariables() {
+        async function initializeGlobalVariables() {
             console.log("Initializing global experiment variables...");
             botActive = jatos.batchJsonInput.botActive || jatos.studyJsonInput.botActive || false;
             showLog = jatos.batchJsonInput.showLog || jatos.studyJsonInput.showLog || false;
-            if (jatos.groupSession.get(PLAYERS_METADATA_PROPERTY) === undefined) {
+            if (jatos.groupSession.get(HUMAN_PLAYERS_PROPERTY) === undefined) {
                 //Make sure group allocation is initialized only once
                 properties = jatos.groupSession.getAll();
                 properties[ALLOCATED_GROUP_PROPERTY] = Math.floor(Math.random() * 3) + 1;
                 const words_list = jatos.batchJsonInput.words_list || jatos.studyJsonInput.words_list || [];
                 const num_splits = jatos.batchJsonInput.num_splits || jatos.studyJsonInput.num_splits || 20;
                 const fraction_size = Math.ceil(words_list.length / num_splits);
+                const shuffled_words_list = shuffle_seed(words_list);
+                properties[TRAINING_WORDS_PROPERTY] = shuffled_words_list.slice(0, fraction_size);
+                properties[MAIN_WORDS_PROPERTY] = shuffled_words_list.slice(fraction_size, 2 * fraction_size);
 
-                properties[TRAINING_WORDS_PROPERTY] = words_list.slice(0, fraction_size);
-                properties[MAIN_WORDS_PROPERTY] = words_list.slice(fraction_size, 2 * fraction_size);
+                initializePlayersMetadata(properties);
 
-                (jatos.groupMembers || []).forEach(
-                    id => {
-                        properties[id + PLAYERS_METADATA_PROPERTY] = "present";
-                    }
-                );
-
-                jatos.groupSession.setAll(properties)
-                    .then(() => { console.log("Group allocation initialized. Allocated group: " + jatos.groupSession.get(ALLOCATED_GROUP_PROPERTY))})
+              await jatos.groupSession.setAll(properties);
+                console.log("Group allocation initialized. Allocated group: " + jatos.groupSession.get(ALLOCATED_GROUP_PROPERTY));
 
             }
             console.log("Global variables initialized");
         }
 
-        function onOpen() {
+        async function onOpen() {
             // Initialize global variables before anything else
-            initializeGlobalVariables();
+            await initializeGlobalVariables();
 
             timeline = [];
             timeline.push(selectAvatarTrial())
@@ -142,7 +187,6 @@
         }
 
         function onMemberLeave(id) {
-            updatePlayersMetadata(id);
             updateRandomAvatar(id);
         }
 
